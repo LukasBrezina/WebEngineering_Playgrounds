@@ -1,3 +1,9 @@
+# Table of Contents
+- [Playground 1](#playground-1)
+  - [Task 1](#task-1)
+  - [Task 2](#task-2)
+  - [Task 3](#task-3)
+
 # Playground 1
 
 ## Task 1
@@ -49,3 +55,39 @@ This is especially useful for dynamic elements (because you do not want to place
 #### Event Delegation – Trade Offs
   - handling of events is more complex, because it is not implicitly clear which element triggered the event
   - when you have deeply nested DOM trees, it could be difficult to determine where the event is captured (to which parent it is delegated)
+
+## Task 3
+
+### How do synchronous exceptions and rejected promises travel through this application? Explain where errors should be caught and why catching every error at its source can make failures harder to diagnose.
+
+#### Application Flow
+In this application, we have following exception flow (bears.js):
+- ``initializeBearsApi()`` calls ``fetchBearData()``
+- ``fetchBearData()`` creates a promise
+- this promise may be rejected (corrupt JSON, network error, API down, etc.)
+- promise goes as 'rejected promise' back to ``initializeBearsApi()``
+- ``initializeBearsApi()`` catches error, prints it to the console and returns mock data, which displays placeholder images (as an excuse) and information that the API is down
+
+```mermaid
+flowchart LR
+    A[fetchBearData] -->|rejected| B[initializeBearsApi]
+    B -->|catch Error| C[return errorData]
+```
+
+#### Catching errors
+When each error is caught at its source, it can make failures harder to diagnose, because the error may be coming from:
+- network
+- API
+- JSON parsing
+- Regex
+- Logic
+- etc.
+
+This also makes debugging very hard & time-consuming.
+For example, when each layer returns some fallback data, it is not clear where the error originated from, and the error may be lost in the process.
+When doing this too often, the application always looks like it is working, but consists of invisible errors, which are hidden from the user.
+
+It is better practice to catch errors at a higher level, where the error can be displayed/logged and replaced with fallback data.
+Synchronous exceptions: try/catch blocks, when try block fails, then catch block is executed
+Rejected promises: when something fails, Promise.reject() is called, which is returned to the caller (higher level), which can then either handle the exception or pass it further up the call stack.
+

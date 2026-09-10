@@ -1,7 +1,27 @@
 const baseUrl = "https://en.wikipedia.org/w/api.php";
 
+const errorData = [
+    {
+        name: "Error fetching bear data. Here is a placeholder :)",
+        binomial: "Urban Bear Placeholder",
+        image: "./media/urban-bear.jpg",
+        range: "N/A"
+    },
+    {
+        name: "And another :)",
+        binomial: "Wild Bear Placeholder",
+        image: "./media/wild-bear.jpg",
+        range: "N/A"
+    }
+];
+
 export function initializeBearsApi() {
-    return fetchBearData().then(wikitext => parseBears(wikitext))
+    return fetchBearData()
+        .then(wikitext => parseBears(wikitext))
+        .catch(error => {
+            console.error("Error fetching bears API:", error);
+            return errorData;
+        })
 }
 
 function fetchBearData() {
@@ -16,9 +36,14 @@ function fetchBearData() {
     };
 
     const url = baseUrl + "?" + new URLSearchParams(params).toString();
-    return fetch(url)
-        .then(res => res.json())
-        .then(data => data.parse.wikitext['*']);
+    try {
+        return fetch(url)
+            .then(res => res.json())
+            .then(data => data.parse.wikitext['*']);
+    } catch (error) {
+        console.error("Error fetching bear data:", error);
+        return Promise.reject(error);
+    }
 }
 
 function parseBears(wikitext) {
@@ -40,13 +65,17 @@ function parseBears(wikitext) {
                 const name = nameMatch[1];
                 const range = rangeMatch[1].trim();
 
-                const bear = fetchImageUrl(fileName).then(imageUrl => ({
-                    name: name,
-                    binomial: binomial,
-                    image: imageUrl,
-                    range: range
-                }));
-                bears.push(bear);
+                try {
+                    const bear = fetchImageUrl(fileName).then(imageUrl => ({
+                        name: name,
+                        binomial: binomial,
+                        image: imageUrl,
+                        range: range
+                    }));
+                    bears.push(bear);
+                } catch (error) {
+                    console.error("Error creating bear object:", error);
+                }
             }
         });
     });
@@ -69,12 +98,18 @@ function fetchImageUrl(fileName) {
     };
 
     const url = baseUrl + "?" + new URLSearchParams(imageParams).toString();
-    return fetch(url)
-        .then(res => res.json())
-        .then(data => {
-            const pages = data.query.pages;
-            const page = Object.values(pages)[0];
-            return page.imageinfo[0].url;
-        })
-        .catch(() => fallbackImage)
+
+    try {
+        return fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                const pages = data.query.pages;
+                const page = Object.values(pages)[0];
+                return page.imageinfo[0].url;
+            })
+            .catch(() => fallbackImage)
+    } catch (error) {
+        console.error("Error fetching image URL:", error);
+        return fallbackImage;
+    }
 }

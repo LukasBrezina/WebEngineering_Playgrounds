@@ -34,7 +34,7 @@ function setupCommentForm() {
     const commentField = document.querySelector('#comment');
     const list = document.querySelector('.comment-container');
 
-    form.onsubmit = function(e) {
+    form.onsubmit = e => {
         e.preventDefault();
         const listItem = document.createElement('li');
         const namePara = document.createElement('p');
@@ -43,7 +43,7 @@ function setupCommentForm() {
         const commentValue = commentField.value;
 
         if (!nameValue || !commentValue) {
-            // error message
+            alert('Please fill in both fields: Name and Comment');
             console.log('Please fill in both fields');
             return;
         }

@@ -15,7 +15,11 @@ export function initializeSearch() {
         const searchKey = this.inputField.value.trim();
         console.log('Searching for:', searchKey);
         this.inputField.value = ""; // reset value
-        if (!searchKey) return;
+
+        if (!searchKey) {
+            alert("Please enter a search term.");
+            return
+        }
 
         const regex = new RegExp('(' + searchKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
 
