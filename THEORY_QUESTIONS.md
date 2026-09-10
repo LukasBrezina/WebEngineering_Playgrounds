@@ -3,6 +3,7 @@
   - [Task 1](#task-1)
   - [Task 2](#task-2)
   - [Task 3](#task-3)
+  - [Task 4](#task-4)
 
 # Playground 1
 
@@ -90,4 +91,67 @@ When doing this too often, the application always looks like it is working, but 
 It is better practice to catch errors at a higher level, where the error can be displayed/logged and replaced with fallback data.
 Synchronous exceptions: try/catch blocks, when try block fails, then catch block is executed
 Rejected promises: when something fails, Promise.reject() is called, which is returned to the caller (higher level), which can then either handle the exception or pass it further up the call stack.
+
+## Task 4
+
+### Explain the relationship between async/await, promises, the microtask queue, and the browser event loop. Also explain why an arrow function is not always an interchangeable replacement for a regular function, particularly regarding this.
+
+#### Promise
+A promise represents a value that will be available later. Basically, it just defines that at some time a value will be there.
+When it is resolved or rejected, the callbacks (``.then()``, ``.catch()``) do not run immediately – they are placed into the **microtask queue**.
+Promise callbacks always run **AFTER** the current synchronous code, but before any regular events.
+
+#### Async/Await
+Syntactic addition for promises. ``await`` schedules the continuation (``.then()``, ``.catch()``) as a microtask.
+```javascript
+const result = await fetch(url)
+// is the same as
+fetch(url).then(response => {})
+```
+
+#### Microtask Queue
+The microtask queue is a high-priority queue used for promise callbacks and async/await continuations.
+The execution within the browser follows this order:
+
+1. Run all synchronous code
+2. Run all microtasks (Promises, async/await)
+3. Render updates
+4. Run macrotasks (setTimeout, setInterval, I/O, events)
+
+#### Browser Event Loop
+The event loop coordinates the call stack, microtask queue, macrotask queue, rendering.
+It ensures that JavaScript appears as asynchronous, even though it is single-threaded.
+
+#### Arrow Functions vs Regular Functions
+A big difference between arrow functions and regular functions comes down to the ``this`` keyword.
+For a **Regular Function** the ``this`` keyword refers to the surround lexical scope.
+```javascript
+button.addEventListener('click', function () {
+    this.classList.add('active'); // this = button
+});
+
+```
+For an **Arrow Function** the ``this`` keyword is lexically bound to the surrounding context where the arrow function was defined.
+```javascript
+button.addEventListener('click', () => {
+    this.classList.add('active'); // this ≠ button
+});
+```
+
+For example, when async code resumes, and the value of ``this`` is used and it refers to the wrong context (due to arrow/regular function),
+it could be difficult to debug.
+This happens, as the error appears asychronously and the stack trace points to the microtask continuation and not the original call.
+
+Another difference is that **Arrow Functions** do not have own ``arguments``.
+```javascript
+// Regular
+function log() {
+    console.log(arguments);
+}
+// Arrow
+const log = () => {
+  console.log(arguments); // ReferenceError
+};
+```
+
 
