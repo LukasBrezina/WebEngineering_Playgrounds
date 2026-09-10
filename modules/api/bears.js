@@ -1,32 +1,65 @@
+const baseUrl = "https://en.wikipedia.org/w/api.php";
+
 export function initializeBearsApi() {
-    fetchBearData();
+    return fetchBearData().then(wikitext => parseBears(wikitext))
 }
 
 function fetchBearData() {
     // Fetching bear data
-    var baseUrl = "https://en.wikipedia.org/w/api.php";
-    var title = "List_of_ursids";
-
-    var params = {
+    const params = {
         action: "parse",
-        page: title,
+        page: "List_of_ursids",
         prop: "wikitext",
         section: 3,
         format: "json",
         origin: "*"
     };
 
-    fetch(baseUrl + "?" + new URLSearchParams(params).toString())
-        .then(function(res) { return res.json(); })
-        .then(function(data) {
-            extractBears(data.parse.wikitext['*']);
-        });
+    const url = baseUrl + "?" + new URLSearchParams(params).toString();
+    return fetch(url)
+        .then(res => res.json())
+        .then(data => data.parse.wikitext['*']);
 }
 
-// fetchImageUrl and extractBears are not exported, as they are only used internally within this module.
+function parseBears(wikitext) {
+    const speciesTables = wikitext.split('{{Species table/end}}');
+    const bears = [];
+
+    speciesTables.forEach(table => {
+        const rows = table.split('{{Species table/row');
+
+        rows.forEach(row => {
+            const nameMatch = row.match(/\|name=\[\[(.*?)\]\]/);
+            const binomialMatch = row.match(/\|binomial=(.*?)\n/);
+            const imageMatch = row.match(/\|image=(.*?)\n/);
+            const rangeMatch = row.match(/\|range=([^|]+)/);
+
+            if (nameMatch && binomialMatch && imageMatch) {
+                const fileName = imageMatch[1].trim().replace('File:', '');
+                const binomial = binomialMatch[1];
+                const name = nameMatch[1];
+                const range = rangeMatch[1].trim();
+
+                const bear = fetchImageUrl(fileName).then(imageUrl => ({
+                    name: name,
+                    binomial: binomial,
+                    image: imageUrl,
+                    range: range
+                }));
+                bears.push(bear);
+            }
+        });
+    });
+
+    return Promise.all(bears);
+}
+
 
 function fetchImageUrl(fileName) {
-    var imageParams = {
+
+    const fallbackImage = './media/wild-bear.jpg'
+
+    const imageParams = {
         action: "query",
         titles: "File:" + fileName,
         prop: "imageinfo",
@@ -35,51 +68,13 @@ function fetchImageUrl(fileName) {
         origin: "*"
     };
 
-    var url = baseUrl + "?" + new URLSearchParams(imageParams).toString();
-    return fetch(url).then(function(res) {
-        return res.json();
-    }).then(function(data) {
-        var pages = data.query.pages;
-        var page = Object.values(pages)[0];
-        return page.imageinfo[0].url;
-    });
-}
-
-function extractBears(wikitext) {
-    var speciesTables = wikitext.split('{{Species table/end}}');
-    var bears = [];
-    speciesTables.forEach(function(table) {
-        var rows = table.split('{{Species table/row');
-        rows.forEach(function(row) {
-            var nameMatch = row.match(/\|name=\[\[(.*?)\]\]/);
-            var binomialMatch = row.match(/\|binomial=(.*?)\n/);
-            var imageMatch = row.match(/\|image=(.*?)\n/);
-
-            if (nameMatch && binomialMatch && imageMatch) {
-                var fileName = imageMatch[1].trim().replace('File:', '');
-
-                fetchImageUrl(fileName).then(function(imageUrl) {
-                    var bear = {
-                        name: nameMatch[1],
-                        binomial: binomialMatch[1],
-                        image: imageUrl,
-                        range: "TODO extract correct range"
-                    };
-                    bears.push(bear);
-
-                    if (bears.length === rows.length) {
-                        var moreBears = document.querySelector('.more_bears');
-                        bears.forEach(function(bear) {
-                            var html = '<div class="bear">' +
-                                '<img src="' + bear.image + '" alt="Image of ' + bear.name + '" style="width:200px; height:auto;">' +
-                                '<p><b>' + bear.name + '</b> (' + bear.binomial + ')</p>' +
-                                '<p>Range: ' + bear.range + '</p>' +
-                                '</div>';
-                            moreBears.innerHTML += html;
-                        });
-                    }
-                });
-            }
-        });
-    });
+    const url = baseUrl + "?" + new URLSearchParams(imageParams).toString();
+    return fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            const pages = data.query.pages;
+            const page = Object.values(pages)[0];
+            return page.imageinfo[0].url;
+        })
+        .catch(() => fallbackImage)
 }

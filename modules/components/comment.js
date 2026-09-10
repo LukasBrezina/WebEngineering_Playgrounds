@@ -5,40 +5,50 @@ export function initializeComments() {
 
 function setupCommentButton() {
     // Show/hide comments toggle
-    var showHideBtn = document.querySelector('.show-hide');
-    var commentWrapper = document.querySelector('.comment-wrapper');
+    const showHideBtn = document.querySelector('.show-hide');
+    const commentWrapper = document.querySelector('.comment-wrapper');
+    let areCommentsVisible = false;
 
-    commentWrapper.style.display = 'none';
+    console.log(commentWrapper)
 
-    showHideBtn.onclick = function() {
-        var showHideText = showHideBtn.textContent;
-        if (showHideText === 'Show comment') {
-            showHideBtn.textContent = 'Hide comments';
-            commentWrapper.style.display = 'block';
-        } else {
-            showHideBtn.textContent = 'Show comments';
-            commentWrapper.style.display = 'none';
-        }
+    const render = () => {
+        // toggles comment form via css
+        commentWrapper.classList.toggle('active', areCommentsVisible)
+        showHideBtn.textContent = areCommentsVisible ? 'Hide comments' : 'Show comments';
+        showHideBtn.setAttribute('aria-expanded', String(areCommentsVisible));
     };
+
+    render();
+
+    showHideBtn.addEventListener('click', () => {
+        areCommentsVisible = !areCommentsVisible;
+        console.log(areCommentsVisible)
+        render();
+    });
 }
 
 function setupCommentForm() {
     // Comment form stuff
-    var form = document.querySelector('.comment-form');
-    var nameField = document.querySelector('#name');
-    var commentField = document.querySelector('#comment');
-    var list = document.querySelector('.comment-container');
+    const form = document.querySelector('.comment-form');
+    const nameField = document.querySelector('#name');
+    const commentField = document.querySelector('#comment');
+    const list = document.querySelector('.comment-container');
 
     form.onsubmit = function(e) {
         e.preventDefault();
+        const listItem = document.createElement('li');
+        const namePara = document.createElement('p');
+        const commentPara = document.createElement('p');
+        const nameValue = nameField.value;
+        const commentValue = commentField.value;
 
-        var listItem = document.createElement('li');
-        var namePara = document.createElement('p');
-        var commentPara = document.createElement('p');
-        var nameValue = nameField.valeu;
-        var commentValue = commentField.value;
+        if (!nameValue || !commentValue) {
+            // error message
+            console.log('Please fill in both fields');
+            return;
+        }
 
-        namePara.textContnet = nameValue;
+        namePara.textContent = nameValue;
         commentPara.textContent = commentValue;
 
         console.log(nameValue);

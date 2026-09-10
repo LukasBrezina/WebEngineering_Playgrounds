@@ -3,31 +3,37 @@ export function initializeSearch() {
     document.querySelector('.search').addEventListener('submit', function(e) {
         e.preventDefault();
 
-        document.querySelectorAll('.highlight').forEach(function(el) {
-            var parent = el.parentNode;
+        // remove old highlights
+        document.querySelectorAll('.highlight').forEach(el => {
+            let parent = el.parentNode;
             parent.replaceChild(document.createTextNode(el.textContent), el);
             parent.normalize();
         });
 
-        var searchKey = this.q.value.trim();
+        // 'this' refers to the context, which is the form element
+        // therefore it is possible to select the input value via element name (name = inputField)
+        const searchKey = this.inputField.value.trim();
+        console.log('Searching for:', searchKey);
+        this.inputField.value = ""; // reset value
         if (!searchKey) return;
 
-        var regex = new RegExp('(' + searchKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        const regex = new RegExp('(' + searchKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
 
-        function walk(node) {
+        function highlightSearchKey(node) {
             if (node.nodeType === 3) { // Text node
-                var match = node.nodeValue.match(regex);
+                const match = node.nodeValue.match(regex);
                 if (match) {
-                    var span = document.createElement('span');
+                    const span = document.createElement('span');
                     span.innerHTML = node.nodeValue.replace(regex, '<mark class="highlight">$1</mark>');
                     node.replaceWith.apply(node, span.childNodes);
                 }
             }
-            else if (node.nodeType === 1 && node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE' && node.tagName !== 'FORM') {
-                node.childNodes.forEach(walk);
+            else if (node.nodeType === 1 && node.tagName === 'ARTICLE' || node.closest('article')) {
+                node.childNodes.forEach(highlightSearchKey);
             }
         }
 
-        walk(document.body);
+        // only search in article
+        document.querySelectorAll('article').forEach(highlightSearchKey);
     });
 }
