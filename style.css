@@ -14,7 +14,11 @@ body {
   width: 80%;
   min-width: 1024px;
   margin: 0 auto;
+  font-family: Arial, sans-serif;
 }
+
+.highlight { background-color: yellow; color: black; }
+.comment-wrapper { display: block; }
 
 /* || typography */
 
