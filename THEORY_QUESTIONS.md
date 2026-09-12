@@ -4,6 +4,7 @@
   - [Task 2](#task-2)
   - [Task 3](#task-3)
   - [Task 4](#task-4)
+  - [Task 5](#task-5)
 
 # Playground 1
 
@@ -74,6 +75,11 @@ flowchart LR
     A[fetchBearData] -->|rejected| B[initializeBearsApi]
     B -->|catch Error| C[return errorData]
 ```
+
+Addition: Task 5 –  when `fetchWikipediaAPI()` fails, it returns a rejected promise to the function that called it, for example `fetchBearWikitext()`.
+`fetchBearWikitext()` then (due to `await`) passes the rejected promises further above to `initializeBearsApi()`, which then throws an error 
+and is caught in the `try/catch` block of `initializeBearsApi()`. Here, the error is logged and handled (by returning placeholder errorData).
+Generally, when a promise is rejected, it throws an error at the point where it was awaited (same as if you would write `throw new Error(...)`, which can be caught in a `try/catch` block.
 
 #### Catching errors
 When each error is caught at its source, it can make failures harder to diagnose, because the error may be coming from:
@@ -154,4 +160,126 @@ const log = () => {
 };
 ```
 
+## Task 5
 
+### Select one of your refactorings and explain how JavaScript scope, closures, references, or prototypes caused the original risk. State how you verified that your refactoring preserved behavior.
+
+#### Bear API
+The original implementation consisted of a single function that both fetched and parsed data, which violated the Single Responsibility Principle. It was therefore split up into several smaller functions, each handling one concern.
+Another refactoring extracted the placeholder error data into a separate module, in order to separate data from logic.
+The `fetch()` logic was also refactored, since it was duplicated across two places. It was extracted into a shared function that takes `params as an argument.
+
+```javascript
+// Example Duplicated Code
+
+// Before
+const fetchBearData = async () => {
+  // Fetching bear data
+  const params = {
+    // ... 
+  };
+  // ...
+  const response = await fetch(url);
+  const data = await response.json();
+  // ...
+};
+
+const fetchImageUrl = async (fileName) => {
+  // ...
+  const imageParams = {
+    // ...
+  };
+  // ...
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    // ...
+  } catch (error) {
+    // ...
+  }
+}
+
+// After
+// shared function
+async function fetchWikipediaApi(params) {
+  const url = BASE_URL + "?" + new URLSearchParams(params).toString();
+  const response = await fetch(url);
+  return await response.json();
+}
+
+```
+
+```javascript
+// Example Single Responsibility Principle
+// Before
+export function initializeSearch() {
+  // search highlights
+  // remove highlights
+  // get search key
+  // ...
+    function highlightSearchKey(node) {
+      // ... highlight nodes
+    }
+  // ...
+}
+
+// After
+export function initializeSearch() {
+  // ...
+  removeHighlights()
+  // ...
+  document.querySelectorAll('article').forEach(article => highlightNode(article, regex));
+}
+
+function removeHighlights() {}
+function highlightNode(node, regex) {}
+```
+
+
+#### Search
+The Single Responsibility Principle was violated here as well, so the relevant logic was extracted into a separate method.
+Directly iterating over `node.childNodes` created a risk, since `node.childNodes` is a live snapshot of the current state rather than a fixed copy.
+Within the same function, nodes were being manipulated and new nodes were potentially added (when highlighting text), changing `node.childNodes` during iteration, which could lead to unexpected behavior or bugs.
+To prevent this, a copy of `node.childNodes` was created before iterating, ensuring that the iteration ran over a static snapshot of the nodes instead.
+
+```javascript
+// iterating over live snapshot (unexpected behavior possible)
+node.childNodes.forEach(highlightSearchKey);
+
+// iterating over static snapshot
+Array.from(node.childNodes).forEach(child => highlightNode(child, regex));
+```
+
+
+#### Comments
+Only refactoring regarding consistency took place.
+
+#### Bears List
+Another risk was found here. Previously, each bear was created and added to the DOM separately.
+As a result, each bear triggered a reparsing and rerendering of all previously inserted bears (the HTML was completely rebuilt on each iteration).
+This negatively impacts the overall performance (with each new bear, all old bears also need to be recreated) → O(n²) complexity
+Therefore, the full HTML is now built at once using `map`and `join`and after that written to `innerHTML` to trigger one single DOM update. (one instead of n DOM updates with n bears)
+
+```javascript
+// each iteration triggers rerendering of all previously inserted bears
+bears.forEach(bear => {
+        moreBears.innerHTML += `
+            <div class="bear">
+                <img src="${bear.image}" alt="${bear.name}" style="width:200px; height:auto;">
+                <p><b>${bear.name}</b> (${bear.binomial})</p>
+                <p>Range: ${bear.range}</p>
+            </div>
+        `;
+    });
+
+// build full html at once and then write to innerHTML to trigger one single DOM update
+const html = bears.map(bear => `
+        <div class="bear">
+            <img src="${bear.image}" alt="${bear.name}" style="width:200px; height:auto;">
+            <p><b>${bear.name}</b> (${bear.binomial})</p>
+            <p>Range: ${bear.range}</p>
+        </div>
+    `).join("")
+
+moreBears.innerHTML = html;
+```

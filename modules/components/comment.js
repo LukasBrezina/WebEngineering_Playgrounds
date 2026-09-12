@@ -22,7 +22,6 @@ function setupCommentButton() {
 
     showHideBtn.addEventListener('click', () => {
         areCommentsVisible = !areCommentsVisible;
-        console.log(areCommentsVisible)
         render();
     });
 }
@@ -34,7 +33,8 @@ function setupCommentForm() {
     const commentField = document.querySelector('#comment');
     const list = document.querySelector('.comment-container');
 
-    form.onsubmit = e => {
+    // Consistency – use addEventListener as in every other file instead of property assignment (form.onsubmit...)
+    form.addEventListener("submit", e => {
         e.preventDefault();
         const listItem = document.createElement('li');
         const namePara = document.createElement('p');
@@ -44,14 +44,11 @@ function setupCommentForm() {
 
         if (!nameValue || !commentValue) {
             alert('Please fill in both fields: Name and Comment');
-            console.log('Please fill in both fields');
             return;
         }
 
         namePara.textContent = nameValue;
         commentPara.textContent = commentValue;
-
-        console.log(nameValue);
 
         list.appendChild(listItem);
         listItem.appendChild(namePara);
@@ -59,5 +56,5 @@ function setupCommentForm() {
 
         nameField.value = '';
         commentField.value = '';
-    };
+    });
 }
