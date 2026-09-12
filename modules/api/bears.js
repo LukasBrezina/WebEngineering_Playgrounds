@@ -38,7 +38,7 @@ function parseBear(bear) {
     const rangeMatch = bear.match(/\|range=([^|]+)/);
 
     if (!nameMatch || !binomialMatch || !imageMatch) {
-        return null;
+        return null; // return null if any of the required fields are missing
     }
 
     return {
@@ -56,7 +56,7 @@ const parseBears = async (wikitext) => {
     const parsedRows = speciesTables.flatMap(table =>
         table.split("{{Species table/row"))
         .map(parseBear)
-        .filter(Boolean); // TODO
+        .filter(Boolean); // remove all falsy values from array (here 'null' which may be returned from parseBear)
 
     // each fetchImageUrl request is awaited concurrently (Promise.all)
     // try & catch is unnecessary, as fetchImageUrl handles errors and returns a fallback image
