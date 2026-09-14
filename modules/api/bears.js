@@ -2,7 +2,7 @@
 import { errorData } from "../data/bear-errordata.js";
 
 const BASE_URL = "https://en.wikipedia.org/w/api.php";
-const FALLBACK_IMAGE = './media/wild-bear.jpg'
+const FALLBACK_IMAGE = './media/noImageFound.jpg'
 // Magic number – extracted to a constant for clarity and maintainability
 const WIKIPEDIA_SECTION_INDEX = 3;
 
