@@ -1,13 +1,13 @@
 export const errorData = [
     {
-        name: "Error fetching bear data. Here is a placeholder :)",
-        binomial: "Urban Bear Placeholder",
+        name: "Error fetching bear data. Enjoy a Urban Bear.",
+        binomial: "N/A",
         image: "./media/urban-bear.jpg",
         range: "N/A"
     },
     {
-        name: "And another :)",
-        binomial: "Wild Bear Placeholder",
+        name: "And a Wild Bear",
+        binomial: "N/A",
         image: "./media/wild-bear.jpg",
         range: "N/A"
     }

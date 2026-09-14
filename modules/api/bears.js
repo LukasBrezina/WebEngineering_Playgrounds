@@ -95,5 +95,10 @@ const fetchImageUrl = async (fileName) => {
 async function fetchWikipediaApi(params) {
     const url = BASE_URL + "?" + new URLSearchParams(params).toString();
     const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`Wikipedia API request failed with status ${response.status}`);
+    }
+
     return await response.json();
 }
