@@ -77,7 +77,7 @@ Find and eliminate the remaining bad coding practices. Consider scope, accidenta
 
 > **What bad coding practices did you find? Why is it a bad practice and how did you fix it?**
 > 
-> _Present your findings here..._
+> Presented in THEORY_QUESTIONS.md
 >
 > ```js
 > console.log('Make use of markdown codesnippets to show and explain good/bad practices!')
