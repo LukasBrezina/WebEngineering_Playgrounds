@@ -31,7 +31,7 @@ function setupCommentForm() {
     const form = document.querySelector('.comment-form');
     const nameField = document.querySelector('#name');
     const commentField = document.querySelector('#comment');
-    const list = document.querySelector('.comment-container');
+    const list = document.querySelector('.comment-container ul');
 
     // Consistency – use addEventListener as in every other file instead of property assignment (form.onsubmit...)
     form.addEventListener("submit", e => {
