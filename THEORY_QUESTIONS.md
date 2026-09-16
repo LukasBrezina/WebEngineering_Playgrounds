@@ -1,14 +1,16 @@
 # Table of Contents
 - [Playground 1](#playground-1)
-  - [Task 1](#task-1)
-  - [Task 2](#task-2)
-  - [Task 3](#task-3)
-  - [Task 4](#task-4)
-  - [Task 5](#task-5)
+  - [Task 1](#task-1--introduce-es-modules)
+  - [Task 2](#task-2--correct-the-application-behavior)
+  - [Task 3](#task-3--make-failures-explicit)
+  - [Task 4](#task-4--refactor-asynchronous-control-flow)
+  - [Task 5](#task-5--remove-remaining-code-smells)
+- [Playground 2](#playground-2)
+  - [Task 1](#task-1--establish-the-build)
 
 # Playground 1
 
-## Task 1
+## Task 1 – Introduce ES modules
 ### How does an ES module differ from a classic script with respect to scope, strict mode, loading, and bindings? Explain why the module boundaries you chose make the application easier to maintain.
 
 #### Classic Script
@@ -35,7 +37,7 @@
   - easier to refactor or change rendering/data logic without touching unrelated paths
 - dependency graph is clear and explicit (import/export)
 
-## Task 2
+## Task 2 – Correct the application behavior
 
 ### Describe event propagation (capturing, target, and bubbling). Where could event delegation be useful in this application, and what trade-off would it introduce?
 
@@ -58,7 +60,7 @@ This is especially useful for dynamic elements (because you do not want to place
   - handling of events is more complex, because it is not implicitly clear which element triggered the event
   - when you have deeply nested DOM trees, it could be difficult to determine where the event is captured (to which parent it is delegated)
 
-## Task 3
+## Task 3 – Make failures explicit
 
 ### How do synchronous exceptions and rejected promises travel through this application? Explain where errors should be caught and why catching every error at its source can make failures harder to diagnose.
 
@@ -98,7 +100,7 @@ It is better practice to catch errors at a higher level, where the error can be 
 Synchronous exceptions: try/catch blocks, when try block fails, then catch block is executed
 Rejected promises: when something fails, Promise.reject() is called, which is returned to the caller (higher level), which can then either handle the exception or pass it further up the call stack.
 
-## Task 4
+## Task 4 – Refactor asynchronous control flow
 
 ### Explain the relationship between async/await, promises, the microtask queue, and the browser event loop. Also explain why an arrow function is not always an interchangeable replacement for a regular function, particularly regarding this.
 
@@ -160,7 +162,7 @@ const log = () => {
 };
 ```
 
-## Task 5
+## Task 5 – Remove remaining code smells
 
 ### Select one of your refactorings and explain how JavaScript scope, closures, references, or prototypes caused the original risk. State how you verified that your refactoring preserved behavior.
 
@@ -283,3 +285,50 @@ const html = bears.map(bear => `
 
 moreBears.innerHTML = html;
 ```
+
+# Playground 2
+
+## Task 1 – Establish the build
+
+### Distinguish source, build, distribution, and deployment. What does your build tool do in development and in a production build, and why is the lockfile important for reproducibility?
+
+#### Source, Build, Distribution & Deployment
+- **Source**
+  - Code written in `/src` folder. Often ES modules and often not directly runnable in browsers as they are.
+- **Build**
+  - Process of transforming the source code into a runnable format. Modules are bundled together, transpiled to older JavaScript versions, minified, etc.
+- **Distribution**
+  - Output of the **build** process. Often stored in `/dist` folder. Contains static, ready-to-go files (HTML, CSS, JS). 
+    They are always generated from the source code and never manually edited.
+- **Deployment**
+  - Process of pushing the **distribution** files to a server or hosting platform, where end users have the ability to access them.
+
+#### Build Tool – Vite
+
+- **Development**
+  - Started with `npx vite`
+  - Vite serves source files using ES module imports in the browser, only transforming code on the fly when requested.
+  - Server starts almost instantly – no full bundling is done.
+  - Changes are seen via **Hot Module Replacement** (full page reload not needed)
+  - Priority lies in speed and debugging
+  
+- **Production**
+  - Started with `npx vite build`
+  - Vite bundles all modules together, removes unused code (tree-shaking), minifies the output and adds content hashes to filenames (purpose of caching).
+  - Priority lies in producing the smallest, fastest-loading and production-ready files.
+
+#### Importance of `package-lock.json`
+`package.json` usually specifies version ranges (for example `^2.1.0`, which means `2.1.0` or newer, but only minor and patch versions, not `3.0.0` or newer).
+`package.json` possible version prefixes:
+- `^` – only minor and patch versions
+- `~` – only patch versions
+- `>` or `>=` or `<` or `<=` – any version greater or smaller than the specified one
+- `=` – exact version
+- `*` or `x` – any version (also `4.x` possible)
+- `-` – any version in a specified range
+- `||` – OR relationship (one of the specified versions must be satisfied)
+
+`package-lock.json` defines the exact resolved versions of every dependency in the full dependency tree. By running `npm ci` anywhere, it is guaranteed that the exact same `node_modules` are produced.
+Without the use of a lockfile, in different environments (local, server, other developer, etc.) different setups may consist of different versions as `package.json` only specifies a range.
+This could potentially lead to bugs or unexpected behavior.
+This is the reason why `package-lock.json` is important for reproducibility and therefore commited to the repository.
