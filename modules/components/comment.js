@@ -42,7 +42,7 @@ function setupCommentForm() {
         const nameValue = nameField.value;
         const commentValue = commentField.value;
 
-        if (!nameValue || !commentValue) {
+        if (!nameValue || !commentValue || nameValue.trim() === '' || commentValue.trim() === '') {
             alert('Please fill in both fields: Name and Comment');
             return;
         }
