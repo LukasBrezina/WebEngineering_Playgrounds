@@ -7,6 +7,7 @@
   - [Task 5](#task-5--remove-remaining-code-smells)
 - [Playground 2](#playground-2)
   - [Task 1](#task-1--establish-the-build)
+  - [Task 2](#task-2--migrate-to-typescript)
 
 # Playground 1
 
@@ -65,7 +66,7 @@ This is especially useful for dynamic elements (because you do not want to place
 ### How do synchronous exceptions and rejected promises travel through this application? Explain where errors should be caught and why catching every error at its source can make failures harder to diagnose.
 
 #### Application Flow
-In this application, we have following exception flow (bears.js):
+In this application, we have following exception flow (bears.ts):
 - ``initializeBearsApi()`` calls ``fetchBearData()``
 - ``fetchBearData()`` creates a promise
 - this promise may be rejected (corrupt JSON, network error, API down, etc.)
@@ -332,3 +333,33 @@ moreBears.innerHTML = html;
 Without the use of a lockfile, in different environments (local, server, other developer, etc.) different setups may consist of different versions as `package.json` only specifies a range.
 This could potentially lead to bugs or unexpected behavior.
 This is the reason why `package-lock.json` is important for reproducibility and therefore commited to the repository.
+
+
+## Task 2 – Migrate to TypeScript
+
+### TypeScript uses structural typing and erases types during compilation. Explain both concepts and why a compile-time type alone cannot guarantee the shape of a Wikipedia API response at runtime.
+
+#### Structural Typing
+TypeScript checks types based on their structure rather than their name. If a value has all
+required properties with the correct types, it is considered to be of that type, regardless of
+how it was declared or where it came from.
+In contrast, nominal typing (Java, C#) requires a class to explicitly declare that it implements or extends a type.
+
+#### Type Erasure
+Types only exist at compile time. When TypeScript is translated to JavaScript, the compiler removes all annotations, interfaces and generics completely.
+
+#### Why a compile-time type alone cannot guarantee the shape of a Wikipedia API response
+The compiler only knows the source code, not what `fetch` returns at runtime. Therefore,
+`response.json()` returns `Promise<any>`. In the generic implementation, the result is cast
+`as T`:
+
+```typescript
+return (await response.json()) as T;
+```
+
+This is only an assertion to the compiler, which trusts it without checking, because it has no access to the runtime data. Due to type erasure, `T` does not even exist at runtime, so no
+check could happen there anyway. If Wikipedia sends something different (a missing property, a changed format, an error object), the code still compiles but fails at runtime, e.g. with `Cannot read properties of
+undefined`. The type only describes what we expect, not what actually arrives.
+
+Therefore, data from external sources must be checked at runtime (e.g. with type guards or
+a schema library) before it is treated as **typed**.

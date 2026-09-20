@@ -1,5 +1,11 @@
-export function renderBears(bears) {
+import {Bear} from "../models/bear.js";
+
+export function renderBears(bears: Bear[]): void {
     const moreBears = document.querySelector('.more_bears');
+
+    if (!moreBears) {
+        throw new Error("Element with class 'more_bears' not found");
+    }
 
     // fragment is a 'temp' container, where the bear divs are added to
     // before adding to DOM to only trigger one reflow instead of one for each bear div

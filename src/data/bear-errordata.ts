@@ -1,4 +1,6 @@
-export const errorData = [
+import {Bear} from "../models/bear.js";
+
+export const errorData: Bear[] = [
     {
         name: "Error fetching bear data. Enjoy a Urban Bear.",
         binomial: "N/A",

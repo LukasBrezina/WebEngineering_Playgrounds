@@ -1,12 +1,14 @@
 // Style – global constants are defined in uppercase
 import { errorData } from "../data/bear-errordata.js";
+import type {Bear, ParsedBear} from "../models/bear.js";
+import type {ImageInfoResponse, WikipediaParams, WikitextResponse} from "../models/wikipedia.js";
 
 const BASE_URL = "https://en.wikipedia.org/w/api.php";
 const FALLBACK_IMAGE = './media/noImageFound.jpg'
 // Magic number – extracted to a constant for clarity and maintainability
 const WIKIPEDIA_SECTION_INDEX = 3;
 
-export async function initializeBearsApi() {
+export async function initializeBearsApi(): Promise<Bear[]> {
     try {
         const wikitext = await fetchBearWikitext();
         return await parseBears(wikitext);
@@ -17,9 +19,9 @@ export async function initializeBearsApi() {
 }
 
 // Style – unclear function name
-const fetchBearWikitext = async () => {
+async function fetchBearWikitext(): Promise<string> {
     // Fetching bear data
-    const data = await fetchWikipediaApi({
+    const data = await fetchWikipediaApi<WikitextResponse>({
         action: "parse",
         page: "List_of_ursids",
         prop: "wikitext",
@@ -27,36 +29,41 @@ const fetchBearWikitext = async () => {
         format: "json",
         origin: "*"
     });
-    return data.parse.wikitext['*'];
-};
+
+    const wikitext = data.parse?.wikitext?.['*'];
+    if (!wikitext) {
+        throw new Error("Failed to fetch wikitext from Wikipedia API");
+    }
+    return wikitext;
+}
 
 // Single Responsibility – Only parsing, nothing else
-function parseBear(bear) {
-    const nameMatch = bear.match(/\|name=\[\[(.*?)\]\]/);
-    const binomialMatch = bear.match(/\|binomial=(.*?)\n/);
-    const imageMatch = bear.match(/\|image=(.*?)\n/);
-    const rangeMatch = bear.match(/\|range=([^|]+)/);
+function parseBear(bear: string): ParsedBear | null {
+    const name = bear.match(/\|name=\[\[(.*?)\]\]/)?.[1]
+    const binomial = bear.match(/\|binomial=(.*?)\n/)?.[1]
+    const image = bear.match(/\|image=(.*?)\n/)?.[1]
+    const range = bear.match(/\|range=([^|]+)/)?.[1]
 
-    if (!nameMatch || !binomialMatch || !imageMatch) {
+    if (!name || !binomial || !image) {
         return null; // return null if any of the required fields are missing
     }
 
     return {
-        name: nameMatch[1],
-        binomial: binomialMatch[1],
-        fileName: imageMatch[1].trim().replace("File:", ""),
-        range: rangeMatch ? rangeMatch[1].trim() : "N/A"
+        name: name,
+        binomial: binomial,
+        fileName: image.trim().replace("File:", ""),
+        range: range ? range.trim() : "N/A"
     };
 }
 
-const parseBears = async (wikitext) => {
+const parseBears = async (wikitext: string): Promise<Bear[]> => {
     const speciesTables = wikitext.split('{{Species table/end}}');
 
     // flatten array to single list and parse bears
     const parsedRows = speciesTables.flatMap(table =>
         table.split("{{Species table/row"))
         .map(parseBear)
-        .filter(Boolean); // remove all falsy values from array (here 'null' which may be returned from parseBear)
+        .filter((bear): bear is ParsedBear => bear !== null); // remove all falsy values from array (here 'null' which may be returned from parseBear)
 
     // each fetchImageUrl request is awaited concurrently (Promise.all)
     // try & catch is unnecessary, as fetchImageUrl handles errors and returns a fallback image
@@ -70,9 +77,9 @@ const parseBears = async (wikitext) => {
     );
 }
 
-const fetchImageUrl = async (fileName) => {
+async function fetchImageUrl(fileName: string): Promise<string> {
     try {
-        const data = await fetchWikipediaApi({
+        const data = await fetchWikipediaApi<ImageInfoResponse>({
             action: "query",
             titles: "File:" + fileName,
             prop: "imageinfo",
@@ -81,9 +88,9 @@ const fetchImageUrl = async (fileName) => {
             origin: "*"
         });
 
-        const pages = data.query.pages;
-        const page = Object.values(pages)[0];
-        return page.imageinfo?.[0]?.url ?? FALLBACK_IMAGE;
+        const pages = data.query?.pages;
+        const page = pages && Object.values(pages)[0];
+        return page?.imageinfo?.[0]?.url ?? FALLBACK_IMAGE;
     } catch (error) {
         console.error("Error fetching image URL:", error);
         return FALLBACK_IMAGE;
@@ -92,13 +99,16 @@ const fetchImageUrl = async (fileName) => {
 
 // Single Responsibility – Only fetching, nothing else
 // Duplicated Code – extracted fetching from fetchingBearWikitext and fetchImageUrl
-async function fetchWikipediaApi(params) {
-    const url = BASE_URL + "?" + new URLSearchParams(params).toString();
+async function fetchWikipediaApi<T>(params: WikipediaParams): Promise<T> {
+
+    const query = new URLSearchParams(Object.entries(params).map(([key, value]) => [key, String(value)])).toString();
+
+    const url = BASE_URL + "?" + query;
     const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(`Wikipedia API request failed with status ${response.status}`);
     }
 
-    return await response.json();
+    return await response.json() as T;
 }

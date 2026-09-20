@@ -1,15 +1,17 @@
-export function initializeComments() {
+export function initializeComments(): void {
     setupCommentButton();
     setupCommentForm();
 }
 
-function setupCommentButton() {
+function setupCommentButton(): void {
     // Show/hide comments toggle
-    const showHideBtn = document.querySelector('.show-hide');
+    const showHideBtn = document.querySelector<HTMLButtonElement>('.show-hide');
     const commentWrapper = document.querySelector('.comment-wrapper');
     let areCommentsVisible = false;
 
-    console.log(commentWrapper)
+    if (!showHideBtn || !commentWrapper) {
+        throw new Error("Required elements not found in the DOM");
+    }
 
     const render = () => {
         // toggles comment form via css
@@ -26,12 +28,16 @@ function setupCommentButton() {
     });
 }
 
-function setupCommentForm() {
+function setupCommentForm(): void {
     // Comment form stuff
-    const form = document.querySelector('.comment-form');
-    const nameField = document.querySelector('#name');
-    const commentField = document.querySelector('#comment');
+    const form = document.querySelector<HTMLFormElement>('.comment-form');
+    const nameField = document.querySelector<HTMLInputElement>('#name');
+    const commentField = document.querySelector<HTMLTextAreaElement>('#comment');
     const list = document.querySelector('.comment-container ul');
+
+    if (!form || !nameField || !commentField || !list) {
+        throw new Error("Required elements not found in the DOM");
+    }
 
     // Consistency – use addEventListener as in every other file instead of property assignment (form.onsubmit...)
     form.addEventListener("submit", e => {

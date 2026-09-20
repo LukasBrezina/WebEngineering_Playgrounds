@@ -1,15 +1,18 @@
 // Single Responsibility – extract removing old highlights and highlighting new nodes into separate methods for better maintainability (Extract Method)
 export function initializeSearch() {
-    document.querySelector('.search').addEventListener('submit', function(e) {
+    const form = document.querySelector<HTMLFormElement>('.search');
+    const inputField = form?.elements.namedItem("inputField");
 
+    if (!form || !(inputField instanceof HTMLInputElement)) {
+        throw new Error("Required elements not found in the DOM");
+    }
+
+    form.addEventListener('submit', e => {
         e.preventDefault();
-
         removeHighlights();
 
-        // 'this' refers to the context, which is the form element
-        // therefore it is possible to select the input value via element name (name = inputField)
-        const searchKey = this.inputField.value.trim();
-        this.inputField.value = ""; // reset value after copying it to searchKey
+        const searchKey = inputField.value.trim();
+        inputField.value = ""; // reset value after copying it to searchKey
 
         if (!searchKey) {
             alert("Please enter a search term.");
@@ -25,21 +28,21 @@ export function initializeSearch() {
 
 // Extract methods
 function removeHighlights() {
-    document.querySelectorAll('.highlight').forEach(el => {
-        let parent = el.parentNode;
-        parent.replaceChild(document.createTextNode(el.textContent), el);
-        parent.normalize();
+    document.querySelectorAll('.highlight').forEach(element => {
+        const parent = element.parentNode;
+        element.replaceWith(document.createTextNode(element.textContent ?? ""));
+        parent?.normalize();
     });
 }
 
-function highlightNode(node, regex) {
-    if (node.nodeType === Node.TEXT_NODE) { // Text node – use Node.TEXT_NODE instead of '3'
-        const match = node.nodeValue.match(regex);
+function highlightNode(node: Node, regex: RegExp) {
+    if (node instanceof Text) {
+        const text = node.nodeValue ?? "";
 
-        if (match) {
+        if (text.match(regex)) {
             // creates a span with child elements (text + markedText + text)
             const span = document.createElement('span');
-            span.innerHTML = node.nodeValue.replace(regex, '<mark class="highlight">$1</mark>');
+            span.innerHTML = text.replace(regex, '<mark class="highlight">$1</mark>');
             // use spread (...) syntax instead of replaceWith.apply
             // calls replaceWith with each element from span.childnodes as separate arguments
             // replace old single text node with the new child nodes (text + markedText + text)
