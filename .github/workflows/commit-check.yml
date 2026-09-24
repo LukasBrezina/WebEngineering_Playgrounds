@@ -1,0 +1,31 @@
+name: Commit Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies (package-lock.json)
+        run: npm ci
+
+      - name: Type check & build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check

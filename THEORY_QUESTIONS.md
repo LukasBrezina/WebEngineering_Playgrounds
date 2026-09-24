@@ -410,3 +410,33 @@ An operation is **idempotent** if running it multiple times with the same input 
 | `dev` | /          | Long-running process, no defined "end state" to compare.                                                   |
 
 **Key point:** Idempotence matters most for CI — a build/check step that varies between runs (due to accumulated state or execution order) makes pipelines unreliable. `npm run build` should produce the exact same output on a fresh CI runner as it does after ten prior runs.
+
+## Task 5 – Enforce quality before integration
+
+### Compare a local pre-commit hook with a CI quality gate. Why is CI still necessary when hooks are configured, and why should CI use non-mutating checks rather than automatically rewriting source files?
+
+#### Pre-commit Hook vs. CI
+
+- **Scope:** 
+  - hook checks only staged files; CI checks the whole branch/PR
+- **Behavior:** 
+  - hook auto-fixes (`--fix`, `--write`); CI only reports pass/fail, changes nothing
+- **Bypassable:** 
+  - hook can be skipped with `--no-verify`; CI cannot
+- **Environment:** 
+  - hook runs locally (variable); CI runs on a fixed, reproducible machine
+
+#### Why CI is still necessary despite the hook
+
+- Hooks can be bypassed (`git commit --no-verify`)
+- If `npm install` never ran, the hook doesn't even exist
+- Merges/squashes on GitHub never pass through a local hook
+- Old commits from before the hook existed are unchecked
+- CI is the only central, enforceable checkpoint (branch protection)
+
+#### Why CI should be non-mutating (no auto-fixes via `--fix` or `--write`)
+
+- CI should verify, not modify — otherwise checked code no longer matches the committed code
+- Auto-fixes in CI would need to be committed back — unclear who, when, how
+- Results must be locally reproducible; auto-fixes would blur that
+- Write access for CI (to push fixes) is an unnecessary security risk
