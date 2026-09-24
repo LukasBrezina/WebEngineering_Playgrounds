@@ -2,7 +2,9 @@ name: Commit Check
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - playground-*
   pull_request:
 
 jobs:
