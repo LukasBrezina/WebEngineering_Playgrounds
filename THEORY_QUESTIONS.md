@@ -363,3 +363,16 @@ undefined`. The type only describes what we expect, not what actually arrives.
 
 Therefore, data from external sources must be checked at runtime (e.g. with type guards or
 a schema library) before it is treated as **typed**.
+
+## Task 3 – Add static analysis and formatting
+
+### What different problems do a linter, a formatter, and the TypeScript compiler detect? Give one concrete example for each from this project.
+
+#### Linter
+A linter detects risky or inconsistent code patterns that are still valid TypeScript. Example from this project: in `parseBear`, the check `if (!name || !binomial || !image)` compiles, but the rule `strict-boolean-expressions` (part of `standard-with-typescript`) reports the implicit check on a `string | undefined`. It also hides a subtle behavior: an empty string is treated as a missing value.
+
+#### Formatter
+A formatter only detects deviations in layout, never in behavior. Example from this project: the code was indented with 4 spaces, but the prescribed Prettier config uses `tabWidth: 2`. Prettier reports `Delete ····` on nearly every line and would also replace `"` with `'` because of `singleQuote: true`. The program behaves exactly the same before and after formatting.
+
+#### TypeScript Compiler
+The compiler detects type errors, meaning values that are used in a way their types do not allow. Example from this project: `fetchImageUrl` was declared as `Promise<ImageInfoResponse>`, but it returns a URL, which is a `string`. The compiler reports that `string` is not assignable to `ImageInfoResponse`. Similarly, `nameField.value` fails because `querySelector` returns `Element | null`, and `Element` has no property `value`.
