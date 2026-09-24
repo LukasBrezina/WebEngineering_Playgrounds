@@ -8,6 +8,9 @@
 - [Playground 2](#playground-2)
   - [Task 1](#task-1--establish-the-build)
   - [Task 2](#task-2--migrate-to-typescript)
+  - [Task 3](#task-3--add-static-analysis-and-formatting)
+  - [Task 4](#task-4--provide-a-consistent-command-interface)
+  - [Task 5](#task-5--enforce-quality-before-integration)
 
 # Playground 1
 
