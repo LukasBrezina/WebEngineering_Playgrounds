@@ -376,3 +376,37 @@ A formatter only detects deviations in layout, never in behavior. Example from t
 
 #### TypeScript Compiler
 The compiler detects type errors, meaning values that are used in a way their types do not allow. Example from this project: `fetchImageUrl` was declared as `Promise<ImageInfoResponse>`, but it returns a URL, which is a `string`. The compiler reports that `string` is not assignable to `ImageInfoResponse`. Similarly, `nameField.value` fails because `querySelector` returns `Element | null`, and `Element` has no property `value`.
+
+## Task 4 – Provide a consistent command interface
+
+### Why are stable, composable commands such as these useful as an interface for developers and CI? Explain idempotence and identify which of your scripts should be idempotent.
+
+#### Why stable, composable scripts matter
+
+npm scripts provide a **uniform, tool-agnostic interface**. Developers and CI both run the exact same command (`npm run build`, `npm run lint`, …), regardless of what's running underneath (Vite, Webpack, ESLint, Prettier).
+
+- **Abstraction**
+  - callers don't need to know the underlying tool or flags; tooling can change without changing the interface.
+- **Composability**
+  - scripts chain easily, e.g. `npm run lint && npm run format:check && npm run build`, or as discrete CI pipeline steps.
+- **Consistency**
+  - local dev and CI run identical checks, eliminating "works on my machine" gaps.
+- **Reliable exit codes**
+  - since `build`, `lint`, and `format:check` exit non-zero on failure, CI can gate merges/deploys automatically without parsing output text.
+
+#### Idempotence
+
+An operation is **idempotent** if running it multiple times with the same input produces the same end state as running it once — repeated calls don't cause additional side effects.
+
+#### Which scripts should be idempotent?
+
+| Script | Idempotent? | Why                                                                                                        |
+|---|------------|------------------------------------------------------------------------------------------------------------|
+| `build` | Yes       | Same source → same `dist` output every time; no accumulating artifacts.                                    |
+| `lint` | Yes        | Read-only check, no side effects.                                                                          |
+| `format:check` | Yes        | Read-only check, no side effects.                                                                          |
+| `format` | Yes        | Formats to a fixed rule set; re-running on already-formatted code changes nothing (reaches a fixed point). |
+| `lint:fix` | ~️          | Ideally idempotent, but if rules conflict with each other it can be non-idempotent.                        |
+| `dev` | /          | Long-running process, no defined "end state" to compare.                                                   |
+
+**Key point:** Idempotence matters most for CI — a build/check step that varies between runs (due to accumulated state or execution order) makes pipelines unreliable. `npm run build` should produce the exact same output on a fresh CI runner as it does after ten prior runs.
