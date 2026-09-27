@@ -24,8 +24,7 @@ export async function initializeBearsApi(): Promise<Bear[]> {
 
 // Style – unclear function name
 async function fetchBearWikitext(): Promise<string> {
-  // Fetching bear data
-  const data = await fetchWikipediaApi<WikitextResponse>({
+  const data = await fetchWikipediaApi({
     action: 'parse',
     page: 'List_of_ursids',
     prop: 'wikitext',
@@ -33,6 +32,10 @@ async function fetchBearWikitext(): Promise<string> {
     format: 'json',
     origin: '*',
   });
+
+  if (!isWikitextResponse(data)) {
+    throw new Error('Invalid Wikipedia API response');
+  }
 
   const wikitext = data.parse?.wikitext?.['*'];
   if (wikitext === undefined) {
@@ -83,7 +86,7 @@ const parseBears = async (wikitext: string): Promise<Bear[]> => {
 
 async function fetchImageUrl(fileName: string): Promise<string> {
   try {
-    const data = await fetchWikipediaApi<ImageInfoResponse>({
+    const data = await fetchWikipediaApi({
       action: 'query',
       titles: 'File:' + fileName,
       prop: 'imageinfo',
@@ -92,11 +95,14 @@ async function fetchImageUrl(fileName: string): Promise<string> {
       origin: '*',
     });
 
+    if (!isImageInfoResponse(data)) {
+      return FALLBACK_IMAGE;
+    }
+
     const pages = data.query?.pages;
-    const page =
-      pages !== undefined && pages !== null
-        ? Object.values(pages)[0]
-        : undefined;
+    if (pages === undefined) return FALLBACK_IMAGE;
+
+    const page = Object.values(pages)[0];
     return page?.imageinfo?.[0]?.url ?? FALLBACK_IMAGE;
   } catch (error) {
     console.error('Error fetching image URL:', error);
@@ -106,13 +112,12 @@ async function fetchImageUrl(fileName: string): Promise<string> {
 
 // Single Responsibility – Only fetching, nothing else
 // Duplicated Code – extracted fetching from fetchingBearWikitext and fetchImageUrl
-async function fetchWikipediaApi<T>(params: WikipediaParams): Promise<T> {
+async function fetchWikipediaApi(params: WikipediaParams): Promise<unknown> {
   const query = new URLSearchParams(
     Object.entries(params).map(([key, value]) => [key, String(value)])
   ).toString();
 
-  const url = BASE_URL + '?' + query;
-  const response = await fetch(url);
+  const response = await fetch(BASE_URL + '?' + query);
 
   if (!response.ok) {
     throw new Error(
@@ -120,5 +125,21 @@ async function fetchWikipediaApi<T>(params: WikipediaParams): Promise<T> {
     );
   }
 
-  return (await response.json()) as T;
+  return await response.json();
+}
+
+// Helper Methods for validating the response types from Wikipedia API
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isWikitextResponse(data: unknown): data is WikitextResponse {
+  if (!isRecord(data) || !isRecord(data.parse)) return false;
+  if (!isRecord(data.parse.wikitext)) return false;
+  return typeof data.parse.wikitext['*'] === 'string';
+}
+
+function isImageInfoResponse(data: unknown): data is ImageInfoResponse {
+  if (!isRecord(data) || !isRecord(data.query)) return false;
+  return isRecord(data.query.pages);
 }

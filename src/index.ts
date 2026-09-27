@@ -6,7 +6,8 @@ import { renderBears } from './components/bears-list.js';
 initializeSearch();
 initializeComments();
 try {
-  await initializeBearsApi().then(renderBears);
+  const bears = await initializeBearsApi();
+  renderBears(bears);
 } catch (error) {
   console.error('Error initializing bears API:', error);
   alert('Something went really wrong.');
