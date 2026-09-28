@@ -355,7 +355,7 @@ Types only exist at compile time. When TypeScript is translated to JavaScript, t
 The compiler only knows the source code, not what `fetch` returns at runtime. 
 
 #### Before (Generic Implementation – no type checking)
-Therefore, `response.json()` returns `Promise<any>`. In the generic implementation, the result is cast
+`response.json()` returns `Promise<any>`. In the generic implementation, the result is cast
 `as T`:
 
 ```typescript
@@ -383,7 +383,7 @@ A linter detects risky or inconsistent code patterns that are still valid TypeSc
 A formatter only detects deviations in layout, never in behavior. Example from this project: the code was indented with 4 spaces, but the prescribed Prettier config uses `tabWidth: 2`. Prettier reports `Delete ····` on nearly every line and would also replace `"` with `'` because of `singleQuote: true`. The program behaves exactly the same before and after formatting.
 
 #### TypeScript Compiler
-The compiler detects type errors, meaning values that are used in a way their types do not allow. Example from this project: `fetchImageUrl` was declared as `Promise<ImageInfoResponse>`, but it returns a URL, which is a `string`. The compiler reports that `string` is not assignable to `ImageInfoResponse`. Similarly, `nameField.value` fails because `querySelector` returns `Element | null`, and `Element` has no property `value`.
+The compiler detects type errors, meaning values that are used in a way their types do not allow. Example from this project: `fetchImageUrl` was declared to return `Promise<ImageInfoResponse>`. However, it returns a URL, which is a `string`. The compiler reports that `string` is not assignable to `ImageInfoResponse` (correct return type: `Promise<string>`). Similarly, `nameField.value` fails because `querySelector` returns `Element | null`, and `Element` has no property `value`.
 
 ## Task 4 – Provide a consistent command interface
 
@@ -408,16 +408,16 @@ An operation is **idempotent** if running it multiple times with the same input 
 
 #### Which scripts should be idempotent?
 
-| Script | Idempotent? | Why                                                                                                        |
-|---|------------|------------------------------------------------------------------------------------------------------------|
-| `build` | Yes       | Same source → same `dist` output every time; no accumulating artifacts.                                    |
-| `lint` | Yes        | Read-only check, no side effects.                                                                          |
-| `format:check` | Yes        | Read-only check, no side effects.                                                                          |
-| `format` | Yes        | Formats to a fixed rule set; re-running on already-formatted code changes nothing (reaches a fixed point). |
-| `lint:fix` | ~️          | Ideally idempotent, but if rules conflict with each other it can be non-idempotent.                        |
-| `dev` | /          | Long-running process, no defined "end state" to compare.                                                   |
+| Script         | Idempotent? | Why                                                                                                        |
+|----------------|-------------|------------------------------------------------------------------------------------------------------------|
+| `build`        | Yes         | Same source → same `dist` output every time; no accumulating artifacts.                                    |
+| `lint`         | Yes         | Read-only check, no side effects.                                                                          |
+| `format:check` | Yes         | Read-only check, no side effects.                                                                          |
+| `format`       | Yes         | Formats to a fixed rule set; re-running on already-formatted code changes nothing (reaches a fixed point). |
+| `lint:fix`     | ~️           | Ideally idempotent, but if rules conflict with each other it can be non-idempotent.                        |
+| `dev`          | /           | Long-running process, no defined "end state" to compare.                                                   |
 
-**Key point:** Idempotence matters most for CI — a build/check step that varies between runs (due to accumulated state or execution order) makes pipelines unreliable. `npm run build` should produce the exact same output on a fresh CI runner as it does after ten prior runs.
+**Key point:** Idempotence matters most for CI — a build/check step that varies between runs (due to accumulated state or execution order) makes pipelines unreliable. `npm run build` should produce the exact same output on a fresh CI runner as it does after multiple prior runs.
 
 ## Task 5 – Enforce quality before integration
 
