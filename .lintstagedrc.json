@@ -1,6 +1,6 @@
 {
-        "src/**/*.{js,ts}": [
+  "src/**/*.{js,ts}": [
     "eslint",
-      "prettier --check"
-    ]
+    "prettier --check"
+  ]
 }
