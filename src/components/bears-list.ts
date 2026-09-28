@@ -38,3 +38,20 @@ export function renderBears(bears: Bear[]): void {
   // the result is the same as appending each child node of the fragment to the DOM
   moreBears.appendChild(fragment);
 }
+
+export function renderApiError(): void {
+  const moreBears = document.querySelector('.more_bears');
+
+  if (moreBears == null) {
+    return;
+  }
+
+  const errorDiv = document.createElement('div');
+
+  const errorParagraph = document.createElement('p');
+  errorParagraph.textContent =
+    'Failed to load bear data. Please try again later. In the meantime, enjoy the bears from above.';
+
+  errorDiv.appendChild(errorParagraph);
+  moreBears.appendChild(errorDiv);
+}

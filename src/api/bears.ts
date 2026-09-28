@@ -1,5 +1,4 @@
 // Style – global constants are defined in uppercase
-import { errorData } from '../data/bear-errordata.js';
 import type { Bear, ParsedBear } from '../models/bear.js';
 import type {
   ImageInfoResponse,
@@ -18,7 +17,7 @@ export async function initializeBearsApi(): Promise<Bear[]> {
     return await parseBears(wikitext);
   } catch (error) {
     console.error('Error fetching bears API:', error);
-    return errorData;
+    throw new Error('Failed to initialize bears API. Please try again later.');
   }
 }
 
