@@ -352,8 +352,10 @@ In contrast, nominal typing (Java, C#) requires a class to explicitly declare th
 Types only exist at compile time. When TypeScript is translated to JavaScript, the compiler removes all annotations, interfaces and generics completely.
 
 #### Why a compile-time type alone cannot guarantee the shape of a Wikipedia API response
-The compiler only knows the source code, not what `fetch` returns at runtime. Therefore,
-`response.json()` returns `Promise<any>`. In the generic implementation, the result is cast
+The compiler only knows the source code, not what `fetch` returns at runtime. 
+
+#### Before (Generic Implementation – no type checking)
+Therefore, `response.json()` returns `Promise<any>`. In the generic implementation, the result is cast
 `as T`:
 
 ```typescript
@@ -366,6 +368,9 @@ undefined`. The type only describes what we expect, not what actually arrives.
 
 Therefore, data from external sources must be checked at runtime (e.g. with type guards or
 a schema library) before it is treated as **typed**.
+
+#### After (Type Guard Implementation – type checking)
+The shape of the API response is checked at runtime via `isWikitextResponse()` and `isImageInfoResponse()`. If the check fails, an error is thrown and the promise is rejected. This ensures that the code only continues with valid data, even if Wikipedia changes its API or returns an unexpected response.
 
 ## Task 3 – Add static analysis and formatting
 
