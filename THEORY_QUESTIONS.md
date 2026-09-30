@@ -13,6 +13,8 @@
   - [Task 5](#task-5--enforce-quality-before-integration)
 - [Playground 3](#playground-3)
   - [Task 1](#task-1--establish-the-react-application)
+  - [Task 2](#task-2--design-the-component-tree)
+  - [Task 3](#task-3--model-state-and-interaction)
 
 # Playground 1
 
@@ -492,3 +494,56 @@ An operation is **idempotent** if running it multiple times with the same input 
 - Legitimate ways to touch the DOM:
   - Use refs and effects for elements React doesn't render.
   - Keep manual code in separate containers outside the root.
+
+## Task 2 – Design the component tree
+
+### Explain how component boundaries and typed props act as contracts. What makes a key stable, why does React need keys during reconciliation, and why is an array index unsuitable when list entries can change order?
+
+#### Component boundaries and typed props as contracts
+
+- Props are a component's interface: typed input in, JSX out.
+- `BearCard({ bear }: { bear: Bear })` means "give me a full `Bear`, I render it." TypeScript rejects anything else at compile time.
+- Caller and component stay decoupled, so internals can change while the props stay the same.
+- Pure rendering keeps the contract honest: same props, same output.
+
+#### Why React needs keys during reconciliation and what makes a key stable
+
+- During reconciliation React diffs the old and new tree and updates only what changed.
+- Without keys it compares list items by position, so one insert at the front makes every item look changed.
+- A key gives each item an identity, so React can keep, move, create or remove the right one.
+- **What makes a key stable?**
+  - Unique among siblings.
+  - Tied to the data, not the position (`bear.binomial`, a comment `id`).
+  - Unchanged between renders, never generated inside `.map` (`Math.random()` remounts everything).
+
+#### Why and index is unsuitable
+
+- The index is a position, not an identity: after reordering, inserting or removing, the same index points to a different item.
+- React then reuses the wrong component, so state, input values and focus stay at the position instead of following the item.
+- Only acceptable for static lists that are never reordered or changed.
+
+## Task 3 – Model state and interaction
+
+### Distinguish props, stored state, and derived values. Explain why direct mutation can produce incorrect React behavior and when lifting state is preferable to introducing context.
+
+#### Props, state, derived values
+
+- **Props:** input from the parent, read-only for the child.
+- **State:** data the component owns and that changes over time (`useState`); a change triggers a re-render.
+- **Derived values:** computed from props or state during render, never stored (`comments.length`, `visible ? 'Hide' : 'Show'`).
+- Rule: if it can be calculated from existing props or state, derive it. Storing it duplicates the truth and lets copies drift apart.
+
+####  Why direct mutation breaks React
+
+- React detects changes by comparing references; `comments.push(x)` keeps the same array reference, so React sees no change and may skip the re-render.
+- Mutating state or props also breaks memoization (`memo`, dependency arrays) and can change data that other components still hold.
+  - Memoization – storing result of a function, so when it is called again with the same input, the stored result is returned instead of recalculating it
+- Always create a new value: `setComments((prev) => [...prev, newComment])`.
+
+#### Lift state or use context
+
+- **Lift state** to the closest common parent when a few nearby components share it (`term` in `App` for search and its readers).
+  - Data flow stays explicit and easy to trace through props.
+- **Use context** when many components at different depths need the same value and passing props through each level (prop drilling) becomes noisy, e.g. theme or current user.
+  - Trade-offs: dependencies become implicit, and every consumer re-renders when the value changes.
+- Default to lifting; add context only when the prop chain gets long.

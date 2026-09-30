@@ -118,10 +118,12 @@ nav .search {
   padding: 0 2em;
 }
 
-.search input, button {
+.search input,
+.search button {
   font-size: 1.6rem;
   height: 32px;
 }
+
 
 .search input[type="search"] {
   flex: 3;
