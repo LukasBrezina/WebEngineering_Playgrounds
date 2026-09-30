@@ -11,6 +11,8 @@
   - [Task 3](#task-3--add-static-analysis-and-formatting)
   - [Task 4](#task-4--provide-a-consistent-command-interface)
   - [Task 5](#task-5--enforce-quality-before-integration)
+- [Playground 3](#playground-3)
+  - [Task 1](#task-1--establish-the-react-application)
 
 # Playground 1
 
@@ -448,3 +450,45 @@ An operation is **idempotent** if running it multiple times with the same input 
 - Auto-fixes in CI would need to be committed back — unclear who, when, how
 - Results must be locally reproducible; auto-fixes would blur that
 - Write access for CI (to push fixes) is an unnecessary security risk
+
+# Playground 3
+
+## Task 1 – Establish the React application
+
+### Contrast imperative DOM updates with React's declarative model. What happens during React's render, reconciliation, and commit phases, and why should code outside React not modify DOM nodes owned by the React root? If you chose not to use React, answer the same questions in the context of your chosen framework.
+
+#### Imperative vs. Declarative Model
+
+- **Imperative**
+  - step by step instructions on how to manipulate the DOM
+    - e.g. `document.createElement`, `appendChild`, `setAttribute`, etc
+  - current state of DOM needs to tracked by yourself
+- **Declarative**
+  - for a given state, you describe what the UI should look like
+  - when state is changed, React automatically updates the DOM to match the new state
+
+#### React Phases
+
+- **Render**
+  - React calls components and gets back a tree of React elements (virtual DOM)
+  - components are pure functions of props and state, so they can be called multiple times without side effects
+- **Reconciliation**
+  - technically part of the **Render** phase
+  - React diffs the new virtual DOM against the previous one to determine what has changed
+  - same type at the same positions results in an update in place
+  - different type means unmount and remount
+  - React uses keys to identify elements in lists and optimize updates
+- **Commit**
+  - React applies the changes to the real DOM (cannot be interrupted)
+  - React also calls lifecycle methods (e.g. `useEffect`) and cleans up unmounted components
+
+#### Why should code outside React not modify DOM nodes owned by the React root?
+
+- React never re-reads the DOM. It assumes the DOM still matches what it last committed.
+- If you change React-managed nodes, React's internal tree and the real DOM diverge:
+  - Updates may silently do nothing, e.g. when React updates a text node you already replaced with a `<mark>`.
+  - Updates may throw errors like `removeChild`/`insertBefore` "not a child of this node".
+  - Your changes get overwritten or lost when React re-creates the node.
+- Legitimate ways to touch the DOM:
+  - Use refs and effects for elements React doesn't render.
+  - Keep manual code in separate containers outside the root.
