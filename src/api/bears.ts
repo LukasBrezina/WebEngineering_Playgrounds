@@ -33,6 +33,7 @@ const parseBears = async (
   // try & catch is unnecessary, as fetchImageUrl handles errors and returns a fallback image
   return await Promise.all(
     parsedRows.map(async ({ name, binomial, fileName, range }) => ({
+      id: formatStringToId(name),
       name,
       binomial,
       range,
@@ -59,3 +60,9 @@ function parseBear(bear: string): ParsedBear | null {
     range: range.trim(),
   };
 }
+
+const formatStringToId = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');

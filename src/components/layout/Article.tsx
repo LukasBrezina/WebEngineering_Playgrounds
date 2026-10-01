@@ -1,12 +1,12 @@
 import { Comments } from '../features/Comments.js';
 import { ApiError } from '../errors/ApiError.js';
 import { BearsList } from '../features/BearsList.js';
-import React, { useEffect, useRef } from 'react';
-import { highlightNode, removeHighlights } from '../../utils/highlightUtils.js';
+import React, { useRef } from 'react';
 import { Introduction } from './article/Introduction.js';
 import { BearInformation } from './article/BearInformation.js';
 import { AuthorInformation } from './article/AuthorInformation.js';
 import { type State } from '../../models/state.js';
+import { useHighlight } from '../../utils/useHighlight.js';
 
 interface ArticleProperties {
   searchTerm: string;
@@ -18,26 +18,7 @@ export function Article({
   state,
 }: ArticleProperties): React.JSX.Element {
   const articleRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const article = articleRef.current;
-
-    if (article === null) {
-      return;
-    }
-
-    removeHighlights(article);
-
-    if (searchTerm === '') {
-      return;
-    }
-
-    const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
-
-    highlightNode(article, regex);
-  }, [searchTerm]);
+  useHighlight(articleRef, searchTerm, state);
 
   return (
     <article ref={articleRef}>

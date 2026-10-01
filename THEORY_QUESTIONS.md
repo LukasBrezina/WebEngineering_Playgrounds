@@ -576,3 +576,51 @@ An operation is **idempotent** if running it multiple times with the same input 
   - Cleanup calls `controller.abort()`, the `fetch` rejects with an `AbortError`, and the network request is actually cancelled.
   - The `.catch` must ignore `AbortError` so it is not shown as an error state.
 - **Difference:** `ignore` only discards the result, while `AbortController` also stops the request and saves bandwidth. Both prevent stale data from overwriting newer results.
+
+## Task 5 – Add client-side routing and verify the migration
+
+### Distinguish client-side rendering, a single-page application, and client-side routing. Compare route parameters with query parameters, and describe one benefit and one cost of the SPA architecture used here.
+
+#### Definitions
+
+- **Client-side rendering (CSR):** The browser builds the UI with JavaScript.
+  - The server sends a nearly empty HTML shell (`<div id="root">`) plus a JS bundle.
+  - React then fetches data and creates the DOM in the browser.
+  - Opposite: server-side rendering (SSR), where the server sends ready-made HTML.
+- **Single-page application (SPA):** An architecture with one HTML document that is loaded once.
+  - Navigation does not reload the page, JavaScript swaps the visible views.
+  - Application state survives navigation.
+- **Client-side routing:** Mapping the URL to components in the browser.
+  - Uses the History API (`pushState`), so the URL changes without a server request.
+  - In this project: React Router (`Routes`, `Route`, `Link`, `useParams`).
+- **How they relate:**
+  - A SPA usually uses CSR and client-side routing.
+  - CSR alone does not make an SPA (a multi-page site can also render each page in the browser).
+  - Client-side routing is what makes the "single page" feel like multiple pages.
+
+#### Route parameters vs. query parameters
+
+- **Route parameter** (`/bears/:bearId`):
+  - Identifies **which resource** is shown.
+  - Required: without it, the route does not match.
+  - Part of the path, read with `useParams()`.
+  - Here: the stable bear id (slug), e.g. `/bears/polar-bear`.
+- **Query parameter** (`?q=polar`):
+  - Describes **how** a resource is displayed (view state: search, filter, sort).
+  - Optional: a sensible default exists (`params.get('q') ?? ''`).
+  - Does not affect which route matches, order does not matter.
+  - Read and written with `useSearchParams()`.
+- **Rule of thumb:**
+  - Page makes no sense without the value → route parameter.
+  - Page works with a default → query parameter.
+
+#### SPA architecture: one benefit and one cost
+
+- **Benefit: fast, smooth navigation without reloads.**
+  - Switching between list and detail does not reload HTML, CSS or JS.
+  - Data is fetched once in `App` and reused, so the detail page needs no extra request.
+  - The fetch/abort/stale-request logic runs once instead of on every page.
+- **Cost: slower first load and weaker SEO / first paint.**
+  - The browser must download and run the JS bundle before anything meaningful appears (hence the loading state).
+  - Crawlers and link previews see an empty shell unless SSR or prerendering is added.
+  - Related: deep links like `/bears/polar-bear` need a server fallback to `index.html`, otherwise a reload returns a 404.
