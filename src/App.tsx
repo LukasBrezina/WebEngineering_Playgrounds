@@ -6,21 +6,34 @@ import { Secondary } from './components/layout/Secondary.js';
 import { Header } from './components/layout/Header.js';
 import { NavigationList } from './components/layout/NavigationList.js';
 import { Footer } from './components/layout/Footer.js';
+import { type State } from './models/state.js';
 
 export function App(): React.JSX.Element {
-  const [bears, setBears] = useState<Bear[]>([]);
-  const [error, setError] = useState<Error | null>(null);
+  const [state, setState] = useState<State>({ status: 'loading' });
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    initializeBearsApi()
+    const controller = new AbortController();
+    setState({ status: 'loading' });
+
+    initializeBearsApi(controller.signal)
       .then((bears: Bear[]) => {
-        setBears(bears);
+        setState(
+          bears.length === 0
+            ? { status: 'empty' }
+            : { status: 'success', bears }
+        );
       })
       .catch((error: Error) => {
-        console.error('Error initializing bears API:', error);
-        setError(error);
+        if (controller.signal.aborted) {
+          return;
+        }
+        setState({ status: 'error', error });
       });
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   return (
@@ -30,7 +43,7 @@ export function App(): React.JSX.Element {
       <NavigationList setSearchTerm={setSearchTerm} />
 
       <main>
-        <Article searchTerm={searchTerm} error={error} bears={bears} />
+        <Article searchTerm={searchTerm} state={state} />
         <Secondary />
       </main>
 

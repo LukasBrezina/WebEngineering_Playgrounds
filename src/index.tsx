@@ -6,4 +6,8 @@ const rootElement = document.getElementById('root');
 if (rootElement == null) {
   throw new Error('Root element not found in the DOM');
 }
-createRoot(rootElement).render(<App />);
+const root = createRoot(rootElement);
+root.render(<App />);
+
+// Test aborting via AbortController
+// setTimeout(() => root.unmount(), 500);

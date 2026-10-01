@@ -1,23 +1,21 @@
 import { Comments } from '../features/Comments.js';
 import { ApiError } from '../errors/ApiError.js';
 import { BearsList } from '../features/BearsList.js';
-import { type Bear } from '../../models/bear.js';
 import React, { useEffect, useRef } from 'react';
 import { highlightNode, removeHighlights } from '../../utils/highlightUtils.js';
 import { Introduction } from './article/Introduction.js';
 import { BearInformation } from './article/BearInformation.js';
 import { AuthorInformation } from './article/AuthorInformation.js';
+import { type State } from '../../models/state.js';
 
 interface ArticleProperties {
   searchTerm: string;
-  error: Error | null;
-  bears: Bear[];
+  state: State;
 }
 
 export function Article({
   searchTerm,
-  error,
-  bears,
+  state,
 }: ArticleProperties): React.JSX.Element {
   const articleRef = useRef<HTMLElement>(null);
 
@@ -50,9 +48,26 @@ export function Article({
 
       <section className="more_bears">
         <h3>More Bears</h3>
-
-        {error != null ? <ApiError /> : <BearsList bears={bears} />}
+        {renderContent(state)}
       </section>
     </article>
   );
+}
+
+function renderContent(state: State): React.JSX.Element {
+  switch (state.status) {
+    case 'loading':
+      return (
+        <div role="status" aria-live="polite" className="loading">
+          <span className="spinner" aria-hidden="true" />
+          <p> Loading bears... </p>
+        </div>
+      );
+    case 'empty':
+      return <p>No bears found.</p>;
+    case 'error':
+      return <ApiError />;
+    case 'success':
+      return <BearsList bears={state.bears} />;
+  }
 }

@@ -547,3 +547,32 @@ An operation is **idempotent** if running it multiple times with the same input 
 - **Use context** when many components at different depths need the same value and passing props through each level (prop drilling) becomes noisy, e.g. theme or current user.
   - Trade-offs: dependencies become implicit, and every consumer re-renders when the value changes.
 - Default to lifting; add context only when the prop chain gets long.
+
+## Task 4 – Load and represent remote data
+
+### Why is fetching data a synchronization with an external system rather than part of pure rendering? Explain how cleanup or cancellation prevents race conditions when a component unmounts or a request becomes irrelevant.
+
+#### Why fetching is synchronization with an external system, not pure rendering
+
+- **Rendering must be pure:** same props/state in, same JSX out. No side effects, no dependence on anything outside the component.
+- **A network request is a side effect:** it talks to the outside world (Wikipedia API), takes time, can fail, and its result is not determined by props/state.
+- **Effects exist for this:** `useEffect` synchronizes React state with a system React does not control (network, timers, DOM APIs, subscriptions).
+- **Doing it during render would break things:**
+  - Render can run multiple times (StrictMode, re-renders), so the request would fire repeatedly.
+  - Calling `setState` during render causes loops.
+- **Pattern:** render describes the UI for the current state, the effect fetches and writes the result into state, and the next render shows it.
+
+#### How cleanup / cancellation prevents race conditions
+
+- **The problem:** requests are asynchronous and responses can arrive in a different order than they were sent.
+  - Request A (old) and request B (new) are in flight, A is slower and arrives last, so it overwrites B's newer result with stale data.
+  - A response arrives after unmount and calls `setState` on a component that no longer exists.
+- **Cleanup function:** React runs it before the effect re-runs and on unmount, so it marks the old effect execution as obsolete.
+- **`ignore` flag (closure per execution):**
+  - Each effect run has its own `ignore = false`.
+  - Cleanup sets it to `true`.
+  - When the response arrives, `if (ignore) return;` discards it, so only the latest execution may update state.
+- **`AbortController` (real cancellation):**
+  - Cleanup calls `controller.abort()`, the `fetch` rejects with an `AbortError`, and the network request is actually cancelled.
+  - The `.catch` must ignore `AbortError` so it is not shown as an error state.
+- **Difference:** `ignore` only discards the result, while `AbortController` also stops the request and saves bandwidth. Both prevent stale data from overwriting newer results.
