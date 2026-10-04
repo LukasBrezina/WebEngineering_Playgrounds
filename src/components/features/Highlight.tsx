@@ -36,14 +36,15 @@ function mark(text: string, regex: RegExp): ReactNode[] {
 // recursively walk through the JSX tree and highlight every found string
 // only works on text and native HTML elements (p, h2, b, etc.)
 function walk(node: ReactNode, regex: RegExp): ReactNode {
-  return Children.map(node, async (child) => {
+  return Children.map(node, (child) => {
     if (typeof child === 'string') return mark(child, regex);
+    if (child instanceof Promise) return null; // do not handle promises
     if (
       isValidElement<{ children?: ReactNode }>(child) &&
       typeof child.type === 'string'
     ) {
       return cloneElement(child, undefined, walk(child.props.children, regex));
     }
-    return await child;
+    return child;
   });
 }
