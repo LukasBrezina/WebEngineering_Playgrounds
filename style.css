@@ -290,3 +290,13 @@ audio {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+.back-button {
+  background: #333;
+  border: 0;
+  color: white;
+  font-size: 1.6rem;
+  height: 32px;
+  padding: 0 1rem;
+  cursor: pointer;
+}

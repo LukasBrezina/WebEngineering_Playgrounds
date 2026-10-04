@@ -1,8 +1,9 @@
 import React from 'react';
 import { Highlight } from './Highlight.js';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { type State } from '../../models/state.js';
 import { ApiError } from '../errors/ApiError.js';
+import { BackButton } from './BackButton.js';
 
 interface BearDetailProperties {
   state: State;
@@ -10,10 +11,6 @@ interface BearDetailProperties {
 
 export function BearDetail({ state }: BearDetailProperties): React.JSX.Element {
   const { bearId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const backTo = { pathname: '/', search: location.search };
 
   function renderContent(): React.JSX.Element {
     if (state.status === 'loading') {
@@ -33,22 +30,16 @@ export function BearDetail({ state }: BearDetailProperties): React.JSX.Element {
 
     if (bear === undefined) {
       return (
-        <p>
-          Bear not found. <Link to={backTo}>Back to list</Link>
-        </p>
+        <>
+          <p>Bear not found.</p>
+          <BackButton />
+        </>
       );
     }
 
     return (
       <>
-        <button
-          type="button"
-          onClick={() => {
-            void navigate(backTo); // void marks a promise as ignored
-          }}
-        >
-          Back
-        </button>
+        <BackButton />
         <Highlight>
           <h2>{bear.name}</h2>
           <img

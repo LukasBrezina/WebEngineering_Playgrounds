@@ -516,7 +516,7 @@ An operation is **idempotent** if running it multiple times with the same input 
   - Tied to the data, not the position (`bear.binomial`, a comment `id`).
   - Unchanged between renders, never generated inside `.map` (`Math.random()` remounts everything).
 
-#### Why and index is unsuitable
+#### Why an index is unsuitable
 
 - The index is a position, not an identity: after reordering, inserting or removing, the same index points to a different item.
 - React then reuses the wrong component, so state, input values and focus stay at the position instead of following the item.

@@ -1,11 +1,9 @@
 import React, { type FormEvent, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-interface SearchProperties {
-  onSearch: (searchTerm: string) => void;
-}
-
-export function Search({ onSearch }: SearchProperties): React.JSX.Element {
-  const [searchTerm, setSearchTerm] = useState('');
+export function Search(): React.JSX.Element {
+  const [params, setParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(params.get('q') ?? '');
 
   function handleSubmit(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();
@@ -17,7 +15,7 @@ export function Search({ onSearch }: SearchProperties): React.JSX.Element {
       return;
     }
 
-    onSearch(term);
+    setParams({ q: term }, { replace: true });
   }
 
   return (

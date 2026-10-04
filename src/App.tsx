@@ -7,16 +7,13 @@ import { Header } from './components/layout/Header.js';
 import { NavigationList } from './components/layout/NavigationList.js';
 import { Footer } from './components/layout/Footer.js';
 import { type State } from './models/state.js';
-import { Link, Route, Routes, useSearchParams } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { BearDetail } from './components/features/BearDetail.js';
+import { BackButton } from './components/features/BackButton.js';
+import { Highlight } from './components/features/Highlight.js';
 
 export function App(): React.JSX.Element {
   const [state, setState] = useState<State>({ status: 'loading' });
-
-  const [, setParams] = useSearchParams();
-  const setSearchTerm = (q: string): void => {
-    setParams(q === '' ? {} : { q }, { replace: true });
-  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,7 +43,7 @@ export function App(): React.JSX.Element {
     <>
       <Header />
 
-      <NavigationList setSearchTerm={setSearchTerm} />
+      <NavigationList />
 
       <main>
         <Routes>
@@ -55,9 +52,13 @@ export function App(): React.JSX.Element {
           <Route
             path="*"
             element={
-              <p>
-                Page not found. <Link to="/">Back to list</Link>
-              </p>
+              <article>
+                <BackButton />
+                <Highlight>
+                  <h2>Page not found</h2>
+                  <p>The page you are looking for does not exist.</p>
+                </Highlight>
+              </article>
             }
           />
         </Routes>

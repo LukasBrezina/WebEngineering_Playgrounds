@@ -1,13 +1,7 @@
 import { Search } from '../features/Search.js';
 import React from 'react';
 
-interface NavigationListProperties {
-  setSearchTerm: (searchTerm: string) => void;
-}
-
-export function NavigationList({
-  setSearchTerm,
-}: NavigationListProperties): React.JSX.Element {
+export function NavigationList(): React.JSX.Element {
   return (
     <nav>
       <ul>
@@ -25,7 +19,7 @@ export function NavigationList({
         </li>
       </ul>
 
-      <Search onSearch={setSearchTerm} />
+      <Search />
     </nav>
   );
 }
