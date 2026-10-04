@@ -13,8 +13,7 @@ import { BearDetail } from './components/features/BearDetail.js';
 export function App(): React.JSX.Element {
   const [state, setState] = useState<State>({ status: 'loading' });
 
-  const [params, setParams] = useSearchParams();
-  const searchTerm = params.get('q') ?? '';
+  const [, setParams] = useSearchParams();
   const setSearchTerm = (q: string): void => {
     setParams(q === '' ? {} : { q }, { replace: true });
   };
@@ -51,10 +50,7 @@ export function App(): React.JSX.Element {
 
       <main>
         <Routes>
-          <Route
-            path="/"
-            element={<Article searchTerm={searchTerm} state={state} />}
-          />
+          <Route path="/" element={<Article state={state} />} />
           <Route path="/bears/:bearId" element={<BearDetail state={state} />} />
           <Route
             path="*"

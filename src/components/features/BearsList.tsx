@@ -1,6 +1,7 @@
 import { type Bear } from '../../models/bear.js';
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Highlight } from './Highlight.js';
 
 interface BearProperties {
   bears: Bear[];
@@ -9,7 +10,7 @@ interface BearProperties {
 export function BearsList({ bears }: BearProperties): React.JSX.Element {
   const location = useLocation();
   return (
-    <>
+    <Highlight>
       {bears.map((bear) => (
         <div className="bear" key={bear.id}>
           <img
@@ -22,14 +23,18 @@ export function BearsList({ bears }: BearProperties): React.JSX.Element {
             <Link
               to={{ pathname: `/bears/${bear.id}`, search: location.search }}
             >
-              <b>{bear.name}</b>
+              <b>
+                <Highlight>{bear.name}</Highlight>
+              </b>
             </Link>{' '}
-            ({bear.binomial})
+            (<Highlight>{bear.binomial}</Highlight>)
           </p>
 
-          <p>Range: {bear.range}</p>
+          <p>
+            Range: <Highlight>{bear.range}</Highlight>
+          </p>
         </div>
       ))}
-    </>
+    </Highlight>
   );
 }

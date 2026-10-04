@@ -1,14 +1,8 @@
-import React, { useRef } from 'react';
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from 'react-router-dom';
+import React from 'react';
+import { Highlight } from './Highlight.js';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { type State } from '../../models/state.js';
 import { ApiError } from '../errors/ApiError.js';
-import { useHighlight } from '../../utils/useHighlight.js';
 
 interface BearDetailProperties {
   state: State;
@@ -16,12 +10,8 @@ interface BearDetailProperties {
 
 export function BearDetail({ state }: BearDetailProperties): React.JSX.Element {
   const { bearId } = useParams();
-  const [params] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const articleRef = useRef<HTMLElement>(null);
-
-  useHighlight(articleRef, params.get('q') ?? '', state);
 
   const backTo = { pathname: '/', search: location.search };
 
@@ -59,19 +49,21 @@ export function BearDetail({ state }: BearDetailProperties): React.JSX.Element {
         >
           Back
         </button>
-        <h2>{bear.name}</h2>
-        <img
-          src={bear.image}
-          alt={bear.name}
-          style={{ width: '300px', height: 'auto' }}
-        />
-        <p>
-          <i>{bear.binomial}</i>
-        </p>
-        <p>Range: {bear.range}</p>
+        <Highlight>
+          <h2>{bear.name}</h2>
+          <img
+            src={bear.image}
+            alt={bear.name}
+            style={{ width: '300px', height: 'auto' }}
+          />
+          <p>
+            <i>{bear.binomial}</i>
+          </p>
+          <p>Range: {bear.range}</p>
+        </Highlight>
       </>
     );
   }
 
-  return <article ref={articleRef}>{renderContent()}</article>;
+  return <article>{renderContent()}</article>;
 }

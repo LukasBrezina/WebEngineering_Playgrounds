@@ -1,4 +1,5 @@
-import React, { useState, type FormEvent } from 'react';
+import React, { type FormEvent, useState } from 'react';
+import { Highlight } from './Highlight.js';
 
 interface Comment {
   name: string;
@@ -39,70 +40,74 @@ export function Comments(): React.JSX.Element {
   };
 
   return (
-    <section className="comments">
-      <button
-        className="show-hide"
-        onClick={() => {
-          setAreCommentsVisible(!areCommentsVisible);
-        }}
-        aria-expanded={areCommentsVisible}
-      >
-        {areCommentsVisible ? 'Hide comments' : 'Show comments'}
-      </button>
+    <Highlight>
+      <section className="comments">
+        <button
+          className="show-hide"
+          onClick={() => {
+            setAreCommentsVisible(!areCommentsVisible);
+          }}
+          aria-expanded={areCommentsVisible}
+        >
+          {areCommentsVisible ? 'Hide comments' : 'Show comments'}
+        </button>
 
-      <div className={`comment-wrapper ${areCommentsVisible ? 'active' : ''}`}>
-        <h2>Add comment</h2>
+        <div
+          className={`comment-wrapper ${areCommentsVisible ? 'active' : ''}`}
+        >
+          <h2>Add comment</h2>
 
-        <form className="comment-form" onSubmit={handleSubmit}>
-          <div className="flex-pair">
-            <label htmlFor="name">Name:</label>
+          <form className="comment-form" onSubmit={handleSubmit}>
+            <div className="flex-pair">
+              <label htmlFor="name">Name:</label>
 
-            <input
-              type="text"
-              name="name"
-              id="name"
-              placeholder="Enter your name"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-              }}
-              required
-            />
+              <input
+                type="text"
+                name="name"
+                id="name"
+                placeholder="Enter your name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                }}
+                required
+              />
+            </div>
+
+            <div className="flex-pair">
+              <label htmlFor="comment">Comment:</label>
+
+              <input
+                name="comment"
+                id="comment"
+                placeholder="Enter your comment"
+                value={comment}
+                onChange={(e) => {
+                  setComment(e.target.value);
+                }}
+                required
+              />
+            </div>
+
+            <div>
+              <input type="submit" value="Submit comment" />
+            </div>
+          </form>
+
+          <div className="comment-container">
+            <h2>Comments</h2>
+
+            <ul>
+              {comments.map((comment, index) => (
+                <li key={index}>
+                  <p>{comment.name}</p>
+                  <p>{comment.comment}</p>
+                </li>
+              ))}
+            </ul>
           </div>
-
-          <div className="flex-pair">
-            <label htmlFor="comment">Comment:</label>
-
-            <input
-              name="comment"
-              id="comment"
-              placeholder="Enter your comment"
-              value={comment}
-              onChange={(e) => {
-                setComment(e.target.value);
-              }}
-              required
-            />
-          </div>
-
-          <div>
-            <input type="submit" value="Submit comment" />
-          </div>
-        </form>
-
-        <div className="comment-container">
-          <h2>Comments</h2>
-
-          <ul>
-            {comments.map((comment, index) => (
-              <li key={index}>
-                <p>{comment.name}</p>
-                <p>{comment.comment}</p>
-              </li>
-            ))}
-          </ul>
         </div>
-      </div>
-    </section>
+      </section>
+    </Highlight>
   );
 }

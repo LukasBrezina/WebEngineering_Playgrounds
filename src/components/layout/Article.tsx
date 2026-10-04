@@ -1,27 +1,20 @@
 import { Comments } from '../features/Comments.js';
 import { ApiError } from '../errors/ApiError.js';
 import { BearsList } from '../features/BearsList.js';
-import React, { useRef } from 'react';
+import React from 'react';
 import { Introduction } from './article/Introduction.js';
 import { BearInformation } from './article/BearInformation.js';
 import { AuthorInformation } from './article/AuthorInformation.js';
 import { type State } from '../../models/state.js';
-import { useHighlight } from '../../utils/useHighlight.js';
+import { Highlight } from '../features/Highlight.js';
 
 interface ArticleProperties {
-  searchTerm: string;
   state: State;
 }
 
-export function Article({
-  searchTerm,
-  state,
-}: ArticleProperties): React.JSX.Element {
-  const articleRef = useRef<HTMLElement>(null);
-  useHighlight(articleRef, searchTerm, state);
-
+export function Article({ state }: ArticleProperties): React.JSX.Element {
   return (
-    <article ref={articleRef}>
+    <article>
       <Introduction />
       <BearInformation />
       <AuthorInformation />
@@ -39,13 +32,19 @@ function renderContent(state: State): React.JSX.Element {
   switch (state.status) {
     case 'loading':
       return (
-        <div role="status" aria-live="polite" className="loading">
-          <span className="spinner" aria-hidden="true" />
-          <p> Loading bears... </p>
-        </div>
+        <Highlight>
+          <div role="status" aria-live="polite" className="loading">
+            <span className="spinner" aria-hidden="true" />
+            <p> Loading bears... </p>
+          </div>
+        </Highlight>
       );
     case 'empty':
-      return <p>No bears found.</p>;
+      return (
+        <Highlight>
+          <p>No bears found.</p>;
+        </Highlight>
+      );
     case 'error':
       return <ApiError />;
     case 'success':
