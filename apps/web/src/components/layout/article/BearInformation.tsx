@@ -47,17 +47,14 @@ export function BearInformation(): React.JSX.Element {
           naturally growing ingredients...
         </p>
 
-        <img src="../../../../media/wild-bear.jpg" alt="Wild bear in forest" />
+        <img src="/media/wild-bear.jpg" alt="Wild bear in forest" />
 
         <p>
           Urban (gentrified) bears on the other hand have largely abandoned the
           old ways...
         </p>
 
-        <img
-          src="../../../../media/urban-bear.jpg"
-          alt="Urban bear near buildings"
-        />
+        <img src="/media/urban-bear.jpg" alt="Urban bear near buildings" />
 
         <h3>Mating rituals</h3>
 
@@ -65,8 +62,8 @@ export function BearInformation(): React.JSX.Element {
 
         <figure>
           <audio controls>
-            <source src="../../../../media/bear.mp3" type="audio/mp3" />
-            <source src="../../../../media/bear.ogg" type="audio/ogg" />
+            <source src="/media/bear.mp3" type="audio/mp3" />
+            <source src="/media/bear.ogg" type="audio/ogg" />
 
             <p>
               It looks like your browser doesn't support HTML5 audio players.

@@ -623,4 +623,25 @@ An operation is **idempotent** if running it multiple times with the same input 
 - **Cost: slower first load and weaker SEO / first paint.**
   - The browser must download and run the JS bundle before anything meaningful appears (hence the loading state).
   - Crawlers and link previews see an empty shell unless SSR or prerendering is added.
-  - Related: deep links like `/bears/polar-bear` need a server fallback to `index.html`, otherwise a reload returns a 404.
+  - Related: deep links like `/bears/polar-bear` need a server fallback to `apps/web/index.html`, otherwise a reload returns a 404.
+
+# Playground 04
+
+## Task 1
+
+### Explain Node's event loop on the server: why does one slow synchronous operation delay every concurrent request, and how does async I/O avoid that? What is a health endpoint for, and who calls it?
+
+#### Why one slow synchronous operation delays every request
+- Node runs your JavaScript on a single thread. The event loop takes one callback from the queue, runs it to completion, then takes the next.
+- A synchronous operation (huge `JSON.parse`, `readFileSync`, a CPU-heavy loop) holds that thread. No other callback can run, so all concurrent requests wait, even a trivial `/health`.
+
+#### How async I/O avoids this
+- Network, disk and timers are handed off to the OS or libuv's thread pool, and the call returns immediately.
+- While the I/O is pending, the thread serves other requests. When it finishes, its callback (or the code after `await`) is queued and runs briefly.
+- `await` only pauses that one function, not the thread.
+- Heavy CPU work belongs in a worker thread or a separate process.
+
+#### What a health endpoint is for
+- A cheap route that answers "is this process alive and responsive?" (here: status, version, uptime).
+- Callers are machines: Docker/Compose healthchecks, Kubernetes liveness/readiness probes, load balancers, uptime monitors, CI smoke tests.
+- A blocked event loop shows up as a timed-out health check, which is the signal for restarting the container.

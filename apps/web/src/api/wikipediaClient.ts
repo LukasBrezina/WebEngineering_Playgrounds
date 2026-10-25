@@ -2,7 +2,7 @@ import type { WikipediaParams } from '../models/wikipedia.js';
 import { isImageInfoResponse, isWikitextResponse } from '../utils/dataUtils.js';
 
 const BASE_URL = 'https://en.wikipedia.org/w/api.php';
-const FALLBACK_IMAGE = './media/noImageFound.jpg';
+const FALLBACK_IMAGE = '/media/noImageFound.jpg';
 // Magic number – extracted to a constant for clarity and maintainability
 const WIKIPEDIA_SECTION_INDEX = 3;
 
