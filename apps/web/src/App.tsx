@@ -48,7 +48,7 @@ export function App(): React.JSX.Element {
       <main>
         <Routes>
           <Route path="/" element={<Article state={state} />} />
-          <Route path="/bears/:bearId" element={<BearDetail state={state} />} />
+          <Route path="/bears/:bearId" element={<BearDetail />} />
           <Route
             path="*"
             element={

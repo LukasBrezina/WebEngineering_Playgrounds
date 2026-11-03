@@ -627,7 +627,7 @@ An operation is **idempotent** if running it multiple times with the same input 
 
 # Playground 04
 
-## Task 1
+## Task 1 – Set up the API workspace
 
 ### Explain Node's event loop on the server: why does one slow synchronous operation delay every concurrent request, and how does async I/O avoid that? What is a health endpoint for, and who calls it?
 
@@ -645,3 +645,30 @@ An operation is **idempotent** if running it multiple times with the same input 
 - A cheap route that answers "is this process alive and responsive?" (here: status, version, uptime).
 - Callers are machines: Docker/Compose healthchecks, Kubernetes liveness/readiness probes, load balancers, uptime monitors, CI smoke tests.
 - A blocked event loop shows up as a timed-out health check, which is the signal for restarting the container.
+
+## Task 2 – Move the Wikipedia call behind a BFF
+
+### What is a Backend for Frontend, and what moves from the browser to the server when you introduce one (shape of the data, secrets, headers, CORS, failure handling)? Why is an empty 200 on upstream failure worse than a 502?
+
+#### Backend for Frontend (BFF)
+- A Backend for Frontend is a small server that sits between a frontend and external services, built for exactly that one frontend.
+- The browser talks only to this server (`/api/bears`), and the server talks to Wikipedia.
+
+#### What moves from the browser to the server
+- **Shape of the data:**
+  - Parsing, image lookups and building IDs happen on the server. The browser receives a clean, typed `Bear` (`id`, `name`, `binomial`, `imageUrl`, `range`) instead of raw Wikipedia data, validated with Zod before it leaves the server.
+- **Secrets:**
+  - API keys and tokens stay on the server and are never shipped in the JavaScript sent to the browser. Wikipedia needs none, but for keyed services this is the main reason for the pattern.
+- **Headers:**
+  - The server sets headers the external service requires, such as the `User-Agent` Wikimedia asks for. Browsers do not allow scripts to set that header.
+- **Cross-Origin Resource Sharing (CORS):**
+  - The browser only calls its own origin, so there is no cross-origin request and Wikipedia's `origin=*` parameter is no longer needed. CORS does not apply to server-to-server calls.
+- **Failure handling:**
+  - Timeouts, bad status codes and unexpected responses are handled in one place and mapped to clear errors: 502 (Bad Gateway: upstream failed or sent something invalid) and 504 (Gateway Timeout: upstream was too slow). The browser only has to deal with the few outcomes of its own server.
+
+#### Why an empty 200 is worse than a 502
+- It is a lie: 200 with an empty list means "no bears exist", but the truth is "we could not find out".
+- The interface cannot tell the difference, so it shows an empty page instead of its error state.
+- Monitoring, health checks, logs and retries react to 5xx codes, so a 200 hides the outage.
+- Caches can store the empty result and keep serving it after Wikipedia has recovered.
+- A 502 or 504 immediately shows that the upstream is at fault, and which kind of fault.

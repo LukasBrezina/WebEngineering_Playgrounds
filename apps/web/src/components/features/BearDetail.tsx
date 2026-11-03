@@ -1,16 +1,39 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Highlight } from './Highlight.js';
 import { useParams } from 'react-router-dom';
-import { type State } from '../../models/state.js';
+import { type Bear } from '../../models/bear.js';
+import { fetchBear } from '../../api/bears.js';
 import { ApiError } from '../errors/ApiError.js';
 import { BackButton } from './BackButton.js';
 
-interface BearDetailProperties {
-  state: State;
-}
+type DetailState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'notFound' }
+  | { status: 'success'; bear: Bear };
 
-export function BearDetail({ state }: BearDetailProperties): React.JSX.Element {
+export function BearDetail(): React.JSX.Element {
   const { bearId } = useParams();
+  const [state, setState] = useState<DetailState>({ status: 'loading' });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setState({ status: 'loading' });
+
+    fetchBear(bearId ?? '', controller.signal)
+      .then((bear) => {
+        setState(
+          bear === null ? { status: 'notFound' } : { status: 'success', bear }
+        );
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState({ status: 'error' });
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [bearId]);
 
   function renderContent(): React.JSX.Element {
     if (state.status === 'loading') {
@@ -22,13 +45,7 @@ export function BearDetail({ state }: BearDetailProperties): React.JSX.Element {
       );
     }
     if (state.status === 'error') return <ApiError />;
-
-    const bear =
-      state.status === 'success'
-        ? state.bears.find((b) => b.id === bearId)
-        : undefined;
-
-    if (bear === undefined) {
+    if (state.status === 'notFound') {
       return (
         <>
           <p>Bear not found.</p>
@@ -37,13 +54,14 @@ export function BearDetail({ state }: BearDetailProperties): React.JSX.Element {
       );
     }
 
+    const { bear } = state;
     return (
       <>
         <BackButton />
         <Highlight>
           <h2>{bear.name}</h2>
           <img
-            src={bear.image}
+            src={bear.imageUrl}
             alt={bear.name}
             style={{ width: '300px', height: 'auto' }}
           />

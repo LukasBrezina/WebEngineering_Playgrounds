@@ -14,7 +14,7 @@ export function BearsList({ bears }: BearProperties): React.JSX.Element {
       {bears.map((bear) => (
         <div className="bear" key={bear.id}>
           <img
-            src={bear.image}
+            src={bear.imageUrl}
             alt={bear.name}
             style={{ width: '200px', height: 'auto' }}
           />
