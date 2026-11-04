@@ -672,3 +672,65 @@ An operation is **idempotent** if running it multiple times with the same input 
 - Monitoring, health checks, logs and retries react to 5xx codes, so a 200 hides the outage.
 - Caches can store the empty result and keep serving it after Wikipedia has recovered.
 - A 502 or 504 immediately shows that the upstream is at fault, and which kind of fault.
+
+## Task 3 – Design the comments API
+
+### Curl demonstrates  201, 204, 400 and 404
+
+```bash
+# POST – 201 Created
+curl -i -X POST http://localhost:3000/api/comments \
+-H "Content-Type: application/json" \
+-d '{"author":"Bob","text":"Nice bear!"}'
+```
+
+```bash
+# POST – 400 Bad Request
+curl -i -X POST http://localhost:3000/api/comments \
+-H "Content-Type: application/json" \
+-d '{"author":"","text":""}'
+```
+
+```bash
+# DELETE – 204 No Content
+curl -i -X DELETE http://localhost:3000/api/comments/ded61aef-a668-4397-9eb3-dd2dc4dd332a
+```
+
+```bash
+# DELETE – 404 Not Found
+curl -i -X DELETE http://localhost:3000/api/comments/unknown
+```
+
+```bash
+# GET – 200 OK
+curl -i http://localhost:3000/api/comments
+```
+
+### Explain safe, idempotent and cacheable methods. Why is POST used for creating and why must DELETE be idempotent? What happens when a client retries a POST after a timeout, and what does that mean for the API?
+
+#### Safe Methods
+- A method is safe if it does not modify server data.
+- Example: GET only retrieves data without changing anything.
+
+#### Idempotent Methods
+- A method is idempotent if multiple identical requests have the same effect as one request.
+- Example: DELETE – deleting the same comment multiple times results in the same final state (the comment stays deleted).
+- PUT is also idempotent.
+
+#### Cacheable Methods
+- A method is cacheable if its response can be stored and reused to avoid unnecessary requests.
+- Example: GET responses can usually be cached.
+
+#### Why is POST used for creating?
+- POST creates a new resource on the server.
+- The server generates the resource ID.
+- POST is not inherently idempotent because sending the same request twice can create two resources.
+
+#### Why must DELETE be idempotent?
+- Repeating the same DELETE request must have the same final effect.
+- The resource remains deleted, even if a subsequent request returns 404.
+
+#### What happens when a client retries POST after a timeout?
+- The server might have created the resource even though the client never received the response.
+- Retrying POST can create a duplicate resource.
+- APIs can prevent this using idempotency keys, allowing repeated requests to return the original result instead of creating duplicates.

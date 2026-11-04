@@ -1,26 +1,30 @@
-import React, { type FormEvent, useState } from 'react';
+import React, { type FormEvent, useEffect, useState } from 'react';
 import { Highlight } from './Highlight.js';
-
-interface Comment {
-  name: string;
-  comment: string;
-}
+import {getComments, Comment, deleteComment, createComment} from "../../api/comments";
 
 export function Comments(): React.JSX.Element {
   const [areCommentsVisible, setAreCommentsVisible] = useState(false);
-
-  const [comments, setComments] = useState<Comment[]>([
-    {
-      name: 'Bob Fossil',
-      comment:
-        'Oh I am so glad you taught me all about the big brown angry guys...',
-    },
-  ]);
-
+  const [comments, setComments] = useState<Comment[]>([]);
   const [name, setName] = useState('');
   const [comment, setComment] = useState('');
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
+  useEffect(() => {
+    const fetchComments = async (): Promise<void> => {
+      try {
+        const data = await getComments();
+        setComments(data);
+        setError('');
+      } catch {
+        setError('Could not load comments.');
+      }
+    };
+    void fetchComments();
+  }, []);
+
+  const handleSubmit = async (
+      e: FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault();
 
     if (name.trim() === '' || comment.trim() === '') {
@@ -28,15 +32,37 @@ export function Comments(): React.JSX.Element {
       return;
     }
 
-    const newComment: Comment = {
-      name: name.trim(),
-      comment: comment.trim(),
-    };
+    try {
+      const newComment = await createComment(
+          name.trim(),
+          comment.trim()
+      );
 
-    setComments((currentComments) => [...currentComments, newComment]);
+      setComments((currentComments) => [
+        ...currentComments,
+        newComment,
+      ]);
 
-    setName('');
-    setComment('');
+      setName('');
+      setComment('');
+      setError('');
+    } catch {
+      setError('Could not submit comment.');
+    }
+  };
+
+  const handleDelete = async (commentId: string): Promise<void> => {
+    try {
+      await deleteComment(commentId);
+
+      setComments((currentComments) =>
+          currentComments.filter((comment) => comment.id !== commentId)
+      );
+
+      setError('');
+    } catch {
+      setError('Could not delete comment.');
+    }
   };
 
   return (
@@ -97,17 +123,24 @@ export function Comments(): React.JSX.Element {
           <div className="comment-container">
             <h2>Comments</h2>
 
-            <ul>
-              {comments.map((comment, index) => (
-                <li key={index}>
-                  <p>{comment.name}</p>
-                  <p>{comment.comment}</p>
-                </li>
-              ))}
-            </ul>
+              <ul>
+                {comments.map((comment) => (
+                    <li key={comment.id}>
+                      <p>{comment.author}</p>
+                      <p>{comment.text}</p>
+
+                      <button
+                          type="button"
+                          onClick={() => handleDelete(comment.id)}
+                      >
+                        Delete
+                      </button>
+                    </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </div>
-      </section>
-    </Highlight>
+        </section>
+      </Highlight>
   );
 }

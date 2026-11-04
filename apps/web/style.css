@@ -291,7 +291,7 @@ audio {
   to { transform: rotate(360deg); }
 }
 
-.back-button {
+.back-button, .delete-button {
   background: #333;
   border: 0;
   color: white;
