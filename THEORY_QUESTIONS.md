@@ -15,6 +15,13 @@
   - [Task 1](#task-1--establish-the-react-application)
   - [Task 2](#task-2--design-the-component-tree)
   - [Task 3](#task-3--model-state-and-interaction)
+  - [Task 4](#task-4--load-and-represent-remote-data)
+  - [Task 5](#task-5--add-client-side-routing-and-verify-the-migration)
+- [Playground 4](#playground-4)
+  - [Task 1](#task-1--set-up-the-api-workspace)
+  - [Task 2](#task-2--move-the-wikipedia-call-behind-a-bff)
+  - [Task 3](#task-3--design-the-comments-api)
+  - [Task 4](#task-4--one-error-format-for-everything)
 
 # Playground 1
 
@@ -625,7 +632,7 @@ An operation is **idempotent** if running it multiple times with the same input 
   - Crawlers and link previews see an empty shell unless SSR or prerendering is added.
   - Related: deep links like `/bears/polar-bear` need a server fallback to `apps/web/index.html`, otherwise a reload returns a 404.
 
-# Playground 04
+# Playground 4
 
 ## Task 1 – Set up the API workspace
 
@@ -734,3 +741,60 @@ curl -i http://localhost:3000/api/comments
 - The server might have created the resource even though the client never received the response.
 - Retrying POST can create a duplicate resource.
 - APIs can prevent this using idempotency keys, allowing repeated requests to return the original result instead of creating duplicates.
+
+## Task 4 – One error format for everything
+
+### Curl demonstrates `application/problem+json` with 400, 404, 502, 500
+
+400 – Bad Request
+```bash
+curl -i -X POST localhost:3000/api/comments -H 'content-type: application/json' -d '{}'
+```
+
+404 – Unknown route
+```bash
+curl -i localhost:3000/api/unknown
+```
+
+404 – Unknown comment
+```bash
+curl -i -X DELETE localhost:3000/api/comments/unknown
+```
+
+502 – (requires wrong Wikipedia Url)
+```bash
+curl -i --max-time 10 localhost:3000/api/bears
+```
+
+500 – Internal Server Error (provoked)
+```bash
+curl -i localhost:3000/api/debug/provoke
+```
+
+### Why should an API have exactly one error contract? Which information must never leave the server in an error, and how do request ids connect a user's complaint to a log line?
+
+#### Why exactly one error contract
+
+- Clients need one parser for every failure. With a single format (RFC 9457 `application/problem+json`), the frontend reads `detail` and `status` in one place instead of handling a different shape per route.
+- Consistency prevents drift. Without a central handler, every route invents its own shape (`{ error }`, `{ error, details }`, plain text), and each one has to be special-cased and tested.
+- Machine-readable and human-readable parts are separated. `status` and `type` are for code, `detail` is for users, `errors` holds per-field problems.
+- A central handler is the only place that decides what is exposed. One place to get the security rules right means no route can accidentally leak internals.
+- Unexpected errors (framework errors, unknown routes, malformed JSON, crashes) go through the same path as expected ones, so the client never sees an HTML or plain-text error page.
+
+#### What must never leave the server
+
+- Stack traces and file paths, because they reveal code structure, library versions and deployment layout.
+- Raw exception messages of unexpected errors (`err.message` from a crash can contain SQL, file names, hostnames, or user data).
+- Internal addresses and upstream details: internal hostnames, IPs, full upstream URLs, upstream response bodies, credentials or tokens in URLs.
+- Configuration and environment values: env vars, API keys, connection strings.
+- Information that helps enumeration or attacks: whether a user or record exists when that is sensitive, or exact versions of the stack.
+- Rule of thumb: expected errors (validation, not found, upstream down) get a deliberate, safe `detail`. Anything unexpected gets a generic "Internal Server Error", and the real cause goes only into the server log.
+
+#### How request ids connect a complaint to a log line
+
+- The server assigns an id per request (or accepts a sane incoming `x-request-id`) and returns it in the response header and in the problem's `instance` field.
+- The same id is attached to every log line of that request (`reqId`), so all logs of one request can be found with a single search.
+- A user reports a problem and gives (or the UI shows) the id from the error. Support runs `grep <id>` on the logs and sees the full story, including the stack trace the user never received.
+- This makes the error response safe and still debuggable: the client gets only a generic message and an id, the server keeps the details.
+- With several services, forwarding the same id downstream lets you follow one request across all of them.
+- The id is only a correlation key. It must carry no meaning or sensitive data, and an incoming one should be validated or replaced (length, characters) so it cannot be used for log injection.

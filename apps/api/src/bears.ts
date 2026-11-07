@@ -1,9 +1,6 @@
 import { type Bear, BearsSchema, type ParsedBear } from './models/bear.js';
-import {
-  UpstreamError,
-  fetchBearWikitext,
-  fetchImageUrl,
-} from './wikipediaClient.js';
+import { fetchBearWikitext, fetchImageUrl } from './wikipediaClient.js';
+import { UpstreamError } from './errors.js';
 
 export async function getBears(): Promise<Bear[]> {
   const bears = await parseBears(await fetchBearWikitext());

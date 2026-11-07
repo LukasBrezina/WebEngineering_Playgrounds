@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UpstreamError, UpstreamTimeoutError } from './errors.js';
 
 const BASE_URL = 'https://en.wikipedia.org/w/api.php';
 const USER_AGENT =
@@ -9,15 +10,6 @@ const FALLBACK_IMAGE = '/media/noImageFound.jpg';
 const WIKIPEDIA_SECTION_INDEX = 3;
 
 type WikipediaParams = Record<string, string | number>;
-
-export class UpstreamError extends Error {
-  constructor(
-    message: string,
-    readonly statusCode: 502 | 504 = 502
-  ) {
-    super(message);
-  }
-}
 
 const WikitextResponse = z.object({
   parse: z.object({ wikitext: z.object({ '*': z.string() }) }),
@@ -83,8 +75,9 @@ async function fetchWikipediaApi<S extends z.ZodType>(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {
-    const timedOut = (error as Error).name === 'TimeoutError';
-    throw new UpstreamError('Wikipedia API unreachable', timedOut ? 504 : 502);
+    throw (error as Error).name === 'TimeoutError'
+      ? new UpstreamTimeoutError()
+      : new UpstreamError('Wikipedia API unreachable');
   }
 
   if (!response.ok) {

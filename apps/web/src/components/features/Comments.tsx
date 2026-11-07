@@ -1,6 +1,12 @@
 import React, { type FormEvent, useEffect, useState } from 'react';
 import { Highlight } from './Highlight.js';
-import {getComments, Comment, deleteComment, createComment} from "../../api/comments";
+import {
+  getComments,
+  type Comment,
+  deleteComment,
+  createComment,
+} from '../../api/comments';
+import { errorMessage } from '../../api/api';
 
 export function Comments(): React.JSX.Element {
   const [areCommentsVisible, setAreCommentsVisible] = useState(false);
@@ -15,16 +21,14 @@ export function Comments(): React.JSX.Element {
         const data = await getComments();
         setComments(data);
         setError('');
-      } catch {
-        setError('Could not load comments.');
+      } catch (e) {
+        setError(errorMessage(e, 'Could not load comments.'));
       }
     };
     void fetchComments();
   }, []);
 
-  const handleSubmit = async (
-      e: FormEvent<HTMLFormElement>
-  ): Promise<void> => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
 
     if (name.trim() === '' || comment.trim() === '') {
@@ -33,21 +37,15 @@ export function Comments(): React.JSX.Element {
     }
 
     try {
-      const newComment = await createComment(
-          name.trim(),
-          comment.trim()
-      );
+      const newComment = await createComment(name.trim(), comment.trim());
 
-      setComments((currentComments) => [
-        ...currentComments,
-        newComment,
-      ]);
+      setComments((currentComments) => [...currentComments, newComment]);
 
       setName('');
       setComment('');
       setError('');
-    } catch {
-      setError('Could not submit comment.');
+    } catch (e) {
+      setError(errorMessage(e, 'Could not submit comment.'));
     }
   };
 
@@ -56,12 +54,12 @@ export function Comments(): React.JSX.Element {
       await deleteComment(commentId);
 
       setComments((currentComments) =>
-          currentComments.filter((comment) => comment.id !== commentId)
+        currentComments.filter((comment) => comment.id !== commentId)
       );
 
       setError('');
-    } catch {
-      setError('Could not delete comment.');
+    } catch (e) {
+      setError(errorMessage(e, 'Could not delete comment.'));
     }
   };
 
@@ -83,7 +81,12 @@ export function Comments(): React.JSX.Element {
         >
           <h2>Add comment</h2>
 
-          <form className="comment-form" onSubmit={handleSubmit}>
+          <form
+            className="comment-form"
+            onSubmit={(e) => {
+              void handleSubmit(e);
+            }}
+          >
             <div className="flex-pair">
               <label htmlFor="name">Name:</label>
 
@@ -120,27 +123,31 @@ export function Comments(): React.JSX.Element {
             </div>
           </form>
 
+          {error !== '' && <p role="alert">{error}</p>}
+
           <div className="comment-container">
             <h2>Comments</h2>
 
-              <ul>
-                {comments.map((comment) => (
-                    <li key={comment.id}>
-                      <p>{comment.author}</p>
-                      <p>{comment.text}</p>
+            <ul>
+              {comments.map((comment) => (
+                <li key={comment.id}>
+                  <p>{comment.author}</p>
+                  <p>{comment.text}</p>
 
-                      <button
-                          type="button"
-                          onClick={() => handleDelete(comment.id)}
-                      >
-                        Delete
-                      </button>
-                    </li>
-                ))}
-              </ul>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleDelete(comment.id);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-        </section>
-      </Highlight>
+        </div>
+      </section>
+    </Highlight>
   );
 }

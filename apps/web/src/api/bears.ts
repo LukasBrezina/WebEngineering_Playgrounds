@@ -1,12 +1,11 @@
 import type { Bear } from '../models/bear.js';
+import { checkResponseOk } from './api';
 
 export async function initializeBearsApi(
   signal?: AbortSignal
 ): Promise<Bear[]> {
   const response = await fetch('/api/bears', { signal });
-  if (!response.ok) {
-    throw new Error(`Bears API request failed with status ${response.status}`);
-  }
+  await checkResponseOk(response);
   return (await response.json()) as Bear[];
 }
 
@@ -18,8 +17,6 @@ export async function fetchBear(
     signal,
   });
   if (response.status === 404) return null;
-  if (!response.ok) {
-    throw new Error(`Bear API request failed with status ${response.status}`);
-  }
+  await checkResponseOk(response);
   return (await response.json()) as Bear;
 }
