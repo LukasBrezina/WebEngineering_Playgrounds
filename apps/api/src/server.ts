@@ -5,6 +5,10 @@ import { randomUUID } from 'node:crypto';
 import { type Comment, comments, createComment } from './models/comments.js';
 import { HttpError, NotFoundError } from './errors.js';
 import { STATUS_CODES } from 'node:http';
+import cors from '@fastify/cors';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import { bearSchema, commentSchema, problem } from './models/swaggerSchemas.js';
 
 const { version } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -15,6 +19,23 @@ const app = Fastify({
   requestIdHeader: 'x-request-id',
   genReqId: () => randomUUID(),
 });
+
+await app.register(cors, {
+  origin: ['http://localhost:4173', 'http://localhost:5173'],
+  methods: ['GET', 'POST', 'DELETE'],
+  allowedHeaders: ['content-type', 'x-request-id'],
+  exposedHeaders: ['x-request-id', 'location'],
+  maxAge: 600,
+});
+
+app.addSchema(problem);
+app.addSchema(commentSchema);
+app.addSchema(bearSchema);
+
+await app.register(swagger, {
+  openapi: { openapi: '3.1.0', info: { title: 'Bears API', version } },
+});
+await app.register(swaggerUi, { routePrefix: '/api/docs' });
 
 app.addHook('onRequest', async (req, reply) => {
   void reply.header('x-request-id', req.id);
@@ -56,33 +77,89 @@ app.setErrorHandler((err: FastifyError | HttpError, req, reply) => {
     });
 });
 
+const problemRef = { $ref: 'Problem#' };
+
 const health = async (): Promise<object> => ({
   status: 'ok',
   version,
   uptime: process.uptime(),
 });
-app.get('/health', health);
-app.get('/api/health', health);
+const healthSchema = {
+  tags: ['health'],
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        status: { type: 'string' },
+        version: { type: 'string' },
+        uptime: { type: 'number' },
+      },
+    },
+  },
+};
+app.get('/health', { schema: { ...healthSchema, hide: true } }, health);
+app.get('/api/health', { schema: healthSchema }, health);
 
-app.get('/api/bears', async () => await getBears());
+app.get(
+  '/api/bears',
+  {
+    schema: {
+      tags: ['bears'],
+      response: {
+        200: { type: 'array', items: { $ref: 'Bear#' } },
+        502: problemRef,
+        504: problemRef,
+      },
+    },
+  },
+  async () => await getBears()
+);
 
-app.get<{ Params: { id: string } }>('/api/bears/:id', async ({ params }) => {
-  const bear = (await getBears()).find((b) => b.id === params.id);
-  if (bear === undefined) throw new NotFoundError('Bear');
-  return bear;
-});
+app.get<{ Params: { id: string } }>(
+  '/api/bears/:id',
+  {
+    schema: {
+      tags: ['bears'],
+      response: {
+        200: { $ref: 'Bear#' },
+        404: problemRef,
+        502: problemRef,
+        504: problemRef,
+      },
+    },
+  },
+  async ({ params }) => {
+    const bear = (await getBears()).find((b) => b.id === params.id);
+    if (bear === undefined) throw new NotFoundError('Bear');
+    return bear;
+  }
+);
 
-app.get('/api/comments', async () => {
-  return [...comments.values()];
-});
+app.get(
+  '/api/comments',
+  {
+    schema: {
+      tags: ['comments'],
+      response: { 200: { type: 'array', items: { $ref: 'Comment#' } } },
+    },
+  },
+  async () => [...comments.values()]
+);
 
 app.post<{ Body: { author: string; text: string } }>(
   '/api/comments',
-  { schema: createComment },
+  {
+    schema: {
+      ...createComment,
+      tags: ['comments'],
+      response: { 201: { $ref: 'Comment#' }, 400: problemRef },
+    },
+  },
   async ({ body }, reply) => {
     const comment: Comment = {
       id: randomUUID(),
-      ...body,
+      author: body.author.trim(),
+      text: body.text.trim(),
       createdAt: new Date().toISOString(),
     };
     comments.set(comment.id, comment);
@@ -95,13 +172,19 @@ app.post<{ Body: { author: string; text: string } }>(
 
 app.delete<{ Params: { commentId: string } }>(
   '/api/comments/:commentId',
+  {
+    schema: {
+      tags: ['comments'],
+      response: { 204: { type: 'null' }, 404: problemRef },
+    },
+  },
   async ({ params }, reply) => {
     if (!comments.delete(params.commentId)) throw new NotFoundError('Comment');
     return await reply.code(204).send();
   }
 );
 
-app.get('/api/debug/provoke', async () => {
+app.get('/api/debug/provoke', { schema: { hide: true } }, async () => {
   throw new Error('Provoked 500');
 });
 

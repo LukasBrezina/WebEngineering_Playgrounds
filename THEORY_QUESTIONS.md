@@ -22,6 +22,7 @@
   - [Task 2](#task-2--move-the-wikipedia-call-behind-a-bff)
   - [Task 3](#task-3--design-the-comments-api)
   - [Task 4](#task-4--one-error-format-for-everything)
+  - [Task 5](#task-5--cors-and-the-api-contract)
 
 # Playground 1
 
@@ -798,3 +799,31 @@ curl -i localhost:3000/api/debug/provoke
 - This makes the error response safe and still debuggable: the client gets only a generic message and an id, the server keeps the details.
 - With several services, forwarding the same id downstream lets you follow one request across all of them.
 - The id is only a correlation key. It must carry no meaning or sensitive data, and an incoming one should be validated or replaced (length, characters) so it cannot be used for log injection.
+
+## Task 5 – CORS and the API contract
+
+### Who enforces CORS, the browser or the server? What is the difference between a simple and a preflighted request? Why can Access-Control-Allow-Origin: * not be combined with credentials, and why does a BFF make most CORS problems disappear?
+
+#### Who enforces CORS?
+
+- The **browser**. The server only sends `Access-Control-Allow-*` headers.
+- The request usually reaches the server. The browser then blocks the page's JavaScript from reading the response.
+- `curl` and server-to-server calls ignore CORS, so it is not API access control.
+
+#### Simple vs. preflighted request
+
+- **Simple:** `GET`/`HEAD`/`POST` with only safe headers and a form-like content type. The browser sends it directly.
+- **Preflighted:** `DELETE`/`PUT`/`PATCH`, `Content-Type: application/json` or custom headers. The browser first sends an `OPTIONS` request and only sends the real request if the server's answer allows it.
+- Example here: `GET /api/bears` is simple, JSON `POST` and `DELETE` are preflighted.
+
+#### Why `*` and credentials don't mix
+
+- `*` means "any site may read this response".
+- With cookies, any malicious site could then act as the logged-in user and read private data.
+- So the browser rejects it. The server must send one explicit origin plus `Access-Control-Allow-Credentials: true`. That is why you use an origin allow-list.
+
+#### Why a BFF removes most CORS problems
+
+- The browser only talks to its own origin, so there are no cross-origin requests, no preflights and no CORS headers.
+- The calls to upstream services are server-to-server, where CORS does not apply.
+- That is why the Vite proxy worked, and why the errors only appeared with `4173` → `3000`.

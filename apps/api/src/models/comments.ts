@@ -13,8 +13,8 @@ export const createComment = {
     required: ['author', 'text'],
     additionalProperties: false,
     properties: {
-      author: { type: 'string', minLength: 1, maxLength: 50 },
-      text: { type: 'string', minLength: 1, maxLength: 500 },
+      author: { type: 'string', minLength: 1, maxLength: 100, pattern: '\\S' },
+      text: { type: 'string', minLength: 1, maxLength: 1000, pattern: '\\S' },
     },
   },
 };
