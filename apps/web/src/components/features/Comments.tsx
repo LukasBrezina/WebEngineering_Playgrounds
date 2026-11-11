@@ -8,7 +8,7 @@ import {
 } from '../../api/comments';
 import { errorMessage } from '../../api/api';
 
-export function Comments(): React.JSX.Element {
+export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
   const [areCommentsVisible, setAreCommentsVisible] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [name, setName] = useState('');
@@ -16,31 +16,36 @@ export function Comments(): React.JSX.Element {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchComments = async (): Promise<void> => {
-      try {
-        const data = await getComments();
-        setComments(data);
-        setError('');
-      } catch (e) {
-        setError(errorMessage(e, 'Could not load comments.'));
-      }
+    let stale = false;
+    setComments([]);
+    setError('');
+    getComments(bearId)
+      .then((data) => {
+        if (!stale) setComments(data);
+      })
+      .catch((e: unknown) => {
+        if (!stale) setError(errorMessage(e, 'Could not load comments.'));
+      });
+    return () => {
+      stale = true;
     };
-    void fetchComments();
-  }, []);
+  }, [bearId]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
 
     if (name.trim() === '' || comment.trim() === '') {
-      alert('Please fill in both fields: Name and Comment');
+      setError('Please fill in both fields: Name and Comment');
       return;
     }
 
     try {
-      const newComment = await createComment(name.trim(), comment.trim());
-
-      setComments((currentComments) => [...currentComments, newComment]);
-
+      const newComment = await createComment(
+        bearId,
+        name.trim(),
+        comment.trim()
+      );
+      setComments((current) => [...current, newComment]);
       setName('');
       setComment('');
       setError('');
@@ -52,11 +57,7 @@ export function Comments(): React.JSX.Element {
   const handleDelete = async (commentId: string): Promise<void> => {
     try {
       await deleteComment(commentId);
-
-      setComments((currentComments) =>
-        currentComments.filter((comment) => comment.id !== commentId)
-      );
-
+      setComments((current) => current.filter((c) => c.id !== commentId));
       setError('');
     } catch (e) {
       setError(errorMessage(e, 'Could not delete comment.'));
@@ -89,7 +90,6 @@ export function Comments(): React.JSX.Element {
           >
             <div className="flex-pair">
               <label htmlFor="name">Name:</label>
-
               <input
                 type="text"
                 name="name"
@@ -105,7 +105,6 @@ export function Comments(): React.JSX.Element {
 
             <div className="flex-pair">
               <label htmlFor="comment">Comment:</label>
-
               <input
                 name="comment"
                 id="comment"
@@ -129,15 +128,14 @@ export function Comments(): React.JSX.Element {
             <h2>Comments</h2>
 
             <ul>
-              {comments.map((comment) => (
-                <li key={comment.id}>
-                  <p>{comment.author}</p>
-                  <p>{comment.text}</p>
-
+              {comments.map((c) => (
+                <li key={c.id}>
+                  <p>{c.author}</p>
+                  <p>{c.text}</p>
                   <button
                     type="button"
                     onClick={() => {
-                      void handleDelete(comment.id);
+                      void handleDelete(c.id);
                     }}
                   >
                     Delete

@@ -1,5 +1,3 @@
-import { Comments } from '../features/Comments.js';
-import { ApiError } from '../errors/ApiError.js';
 import { BearsList } from '../features/BearsList.js';
 import React from 'react';
 import { Introduction } from './article/Introduction.js';
@@ -18,7 +16,6 @@ export function Article({ state }: ArticleProperties): React.JSX.Element {
       <Introduction />
       <BearInformation />
       <AuthorInformation />
-      <Comments />
 
       <section className="more_bears">
         <h3>More Bears</h3>
@@ -35,18 +32,22 @@ function renderContent(state: State): React.JSX.Element {
         <Highlight>
           <div role="status" aria-live="polite" className="loading">
             <span className="spinner" aria-hidden="true" />
-            <p> Loading bears... </p>
+            <p>Loading bears...</p>
           </div>
         </Highlight>
       );
     case 'empty':
       return (
         <Highlight>
-          <p>No bears found.</p>;
+          <p>No bears found.</p>
         </Highlight>
       );
     case 'error':
-      return <ApiError />;
+      return (
+        <Highlight>
+          <p role="alert">{state.message}</p>
+        </Highlight>
+      );
     case 'success':
       return <BearsList bears={state.bears} />;
   }

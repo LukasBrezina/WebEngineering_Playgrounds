@@ -100,6 +100,16 @@ const healthSchema = {
 app.get('/health', { schema: { ...healthSchema, hide: true } }, health);
 app.get('/api/health', { schema: healthSchema }, health);
 
+const requireBear = async (id: string): Promise<void> => {
+  if (!(await getBears()).some((b) => b.id === id))
+    throw new NotFoundError('Bear');
+};
+
+const bearIdParams = {
+  type: 'object',
+  properties: { id: { type: 'string' } },
+};
+
 app.get(
   '/api/bears',
   {
@@ -135,29 +145,47 @@ app.get<{ Params: { id: string } }>(
   }
 );
 
-app.get(
-  '/api/comments',
+app.get<{ Params: { id: string } }>(
+  '/api/bears/:id/comments',
   {
     schema: {
+      params: bearIdParams,
       tags: ['comments'],
-      response: { 200: { type: 'array', items: { $ref: 'Comment#' } } },
+      response: {
+        200: { type: 'array', items: { $ref: 'Comment#' } },
+        404: problemRef,
+        502: problemRef,
+        504: problemRef,
+      },
     },
   },
-  async () => [...comments.values()]
+  async ({ params }) => {
+    await requireBear(params.id);
+    return [...comments.values()].filter((c) => c.bearId === params.id);
+  }
 );
 
-app.post<{ Body: { author: string; text: string } }>(
-  '/api/comments',
+app.post<{ Params: { id: string }; Body: { author: string; text: string } }>(
+  '/api/bears/:id/comments',
   {
     schema: {
       ...createComment,
+      params: bearIdParams,
       tags: ['comments'],
-      response: { 201: { $ref: 'Comment#' }, 400: problemRef },
+      response: {
+        201: { $ref: 'Comment#' },
+        400: problemRef,
+        404: problemRef,
+        502: problemRef,
+        504: problemRef,
+      },
     },
   },
-  async ({ body }, reply) => {
+  async ({ params, body }, reply) => {
+    await requireBear(params.id);
     const comment: Comment = {
       id: randomUUID(),
+      bearId: params.id,
       author: body.author.trim(),
       text: body.text.trim(),
       createdAt: new Date().toISOString(),

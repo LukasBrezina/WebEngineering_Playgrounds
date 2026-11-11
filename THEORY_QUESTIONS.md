@@ -685,33 +685,45 @@ An operation is **idempotent** if running it multiple times with the same input 
 
 ### Curl demonstrates  201, 204, 400 and 404
 
+POST – 201 Created
 ```bash
-# POST – 201 Created
-curl -i -X POST http://localhost:3000/api/comments \
+curl -i -X POST http://localhost:3000/api/bears/u-arctos/comments \
 -H "Content-Type: application/json" \
 -d '{"author":"Bob","text":"Nice bear!"}'
 ```
 
+POST – 400 Bad Request
 ```bash
-# POST – 400 Bad Request
-curl -i -X POST http://localhost:3000/api/comments \
+curl -i -X POST http://localhost:3000/api/bears/u-arctos/comments \
 -H "Content-Type: application/json" \
 -d '{"author":"","text":""}'
 ```
 
+POST – 404 Unknown bear
 ```bash
-# DELETE – 204 No Content
-curl -i -X DELETE http://localhost:3000/api/comments/ded61aef-a668-4397-9eb3-dd2dc4dd332a
+curl -i -X POST http://localhost:3000/api/bears/unknown/comments \
+-H "Content-Type: application/json" \
+-d '{"author":"Bob","text":"Nice bear!"}'
 ```
 
+GET – 200 OK (comments of one bear)
 ```bash
-# DELETE – 404 Not Found
+curl -i http://localhost:3000/api/bears/u-arctos/comments
+```
+
+GET – 404 Unknown bear
+```bash
+curl -i http://localhost:3000/api/bears/unknown/comments
+```
+
+DELETE – 204 No Content (id from the POST response)
+```bash
+curl -i -X DELETE http://localhost:3000/api/comments/ca06fdad-ac88-4677-b1aa-84fe2ede1696
+```
+
+DELETE – 404 Not Found
+```bash
 curl -i -X DELETE http://localhost:3000/api/comments/unknown
-```
-
-```bash
-# GET – 200 OK
-curl -i http://localhost:3000/api/comments
 ```
 
 ### Explain safe, idempotent and cacheable methods. Why is POST used for creating and why must DELETE be idempotent? What happens when a client retries a POST after a timeout, and what does that mean for the API?
@@ -749,12 +761,17 @@ curl -i http://localhost:3000/api/comments
 
 400 – Bad Request
 ```bash
-curl -i -X POST localhost:3000/api/comments -H 'content-type: application/json' -d '{}'
+curl -i -X POST localhost:3000/api/bears/u-arctos/comments -H 'content-type: application/json' -d '{}'
 ```
 
 404 – Unknown route
 ```bash
 curl -i localhost:3000/api/unknown
+```
+
+404 – Unknown bear
+```bash
+curl -i localhost:3000/api/bears/unknown/comments
 ```
 
 404 – Unknown comment

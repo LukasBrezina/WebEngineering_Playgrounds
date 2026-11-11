@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { type Bear } from './models/bear.js';
 import { initializeBearsApi } from './api/bears.js';
+import { errorMessage } from './api/api.js';
 import { Article } from './components/layout/Article.js';
 import { Secondary } from './components/layout/Secondary.js';
 import { Header } from './components/layout/Header.js';
@@ -27,11 +28,12 @@ export function App(): React.JSX.Element {
             : { status: 'success', bears }
         );
       })
-      .catch((error: Error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setState({ status: 'error', error });
+      .catch((e: unknown) => {
+        if (controller.signal.aborted) return;
+        setState({
+          status: 'error',
+          message: errorMessage(e, 'Could not load bears.'),
+        });
       });
 
     return () => {

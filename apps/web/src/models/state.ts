@@ -4,4 +4,4 @@ export type State =
   | { status: 'loading' }
   | { status: 'success'; bears: Bear[] }
   | { status: 'empty' }
-  | { status: 'error'; error: Error };
+  | { status: 'error'; message: string };

@@ -3,12 +3,13 @@ import { Highlight } from './Highlight.js';
 import { useParams } from 'react-router-dom';
 import { type Bear } from '../../models/bear.js';
 import { fetchBear } from '../../api/bears.js';
-import { ApiError } from '../errors/ApiError.js';
+import { errorMessage } from '../../api/api.js';
 import { BackButton } from './BackButton.js';
+import { Comments } from './Comments.js';
 
 type DetailState =
   | { status: 'loading' }
-  | { status: 'error' }
+  | { status: 'error'; message: string }
   | { status: 'notFound' }
   | { status: 'success'; bear: Bear };
 
@@ -26,8 +27,12 @@ export function BearDetail(): React.JSX.Element {
           bear === null ? { status: 'notFound' } : { status: 'success', bear }
         );
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setState({ status: 'error' });
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted)
+          setState({
+            status: 'error',
+            message: errorMessage(e, 'Could not load bear.'),
+          });
       });
 
     return () => {
@@ -44,7 +49,14 @@ export function BearDetail(): React.JSX.Element {
         </div>
       );
     }
-    if (state.status === 'error') return <ApiError />;
+    if (state.status === 'error') {
+      return (
+        <>
+          <BackButton />
+          <p role="alert">{state.message}</p>
+        </>
+      );
+    }
     if (state.status === 'notFound') {
       return (
         <>
@@ -70,6 +82,7 @@ export function BearDetail(): React.JSX.Element {
           </p>
           <p>Range: {bear.range}</p>
         </Highlight>
+        <Comments bearId={bear.id} />
       </>
     );
   }
