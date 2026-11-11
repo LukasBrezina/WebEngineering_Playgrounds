@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
-export const BearSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  binomial: z.string().min(1),
-  imageUrl: z.string().min(1),
-  range: z.string().min(1),
-});
+export const BearSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    binomial: z.string().min(1),
+    imageUrl: z.string().min(1),
+    range: z.string().min(1),
+  })
+  .meta({ id: 'Bear' });
 
 export const BearsSchema = z
   .array(BearSchema)

@@ -38,6 +38,44 @@ The project introduces a lot of code smells for you to tackle.
 - Worst JS coding practices :cold_sweat:
 - No Build and Dependency Management at all :fire:
 
+## Running the project
+
+| Command | What it does |
+|---|---|
+| `npm install` | Installs the dependencies of both workspaces (`apps/web`, `apps/api`) |
+| `npm run dev` | Starts the API (`tsx watch`, port 3000) and the web app (Vite, port 5173) with hot reload; Vite proxies `/api` to the API |
+| `docker compose up --build` | Builds and starts both containers: web app on `http://localhost:8080` (nginx proxies `/api` to the API), API on `http://localhost:3000` |
+| `npm run lint` / `format:check` / `typecheck` / `build` | Quality checks for both workspaces (also run in CI) |
+
+API documentation (OpenAPI 3.1, Swagger UI): `http://localhost:3000/api/docs`, raw document at `/api/docs/json`.
+
+### Environment variables
+
+No secrets are needed; every variable has a working default. They are validated with zod at startup (`apps/api/src/config.ts`), so a wrong value stops the API immediately instead of failing on the first request.
+
+| Variable | Workspace | Default | Purpose |
+|---|---|---|---|
+| `PORT` | api | `3000` | Port the API listens on |
+| `HOST` | api | `0.0.0.0` | Interface the API binds to |
+| `WIKIPEDIA_API_URL` | api | `https://en.wikipedia.org/w/api.php` | Upstream URL; set a wrong hostname (e.g. `https://en.wikipedia.invalid/w/api.php`) to simulate an outage (502) |
+| `CORS_ORIGINS` | api | `http://localhost:4173,http://localhost:5173` | Comma-separated CORS allow-list (`compose.yaml` adds `http://localhost:8080`) |
+| `VITE_API_BASE_URL` | web (build time) | empty | Empty: same-origin requests to `/api`. Absolute URL (e.g. `http://localhost:3000`): cross-origin requests, used for the CORS demo with `vite preview` |
+
+Examples:
+
+```bash
+WIKIPEDIA_API_URL=https://en.wikipedia.invalid/w/api.php npm run dev -w apps/api
+```
+
+```bash
+VITE_API_BASE_URL=http://localhost:3000 npm run build -w apps/web && npm run preview -w apps/web
+```
+
+### Libraries beyond the lecture stack
+
+| Library | Why |
+|---|---|
+| `fastify-type-provider-zod` | Connects zod to Fastify: the same zod schemas validate requests, serialize responses, type the route handlers and are turned into the OpenAPI document. Without it, every schema would exist twice (zod plus hand-written JSON Schema) and could drift apart. |
 
 # Coding Playground Description
 

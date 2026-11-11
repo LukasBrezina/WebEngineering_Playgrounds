@@ -726,6 +726,11 @@ DELETE – 404 Not Found
 curl -i -X DELETE http://localhost:3000/api/comments/unknown
 ```
 
+### Why comments survive a page reload but not an API restart
+- Comments are stored in a `Map` inside the memory (heap) of the running API process, not in the browser.
+- A page reload only restarts the React app. On mount, `Comments` calls `GET /api/bears/:id/comments` again, and the API process, which is still running, returns the same `Map` contents.
+- An API restart ends the Node process, and the operating system frees its memory. The new process starts with an empty `Map`, so all comments are gone.
+- The `Map` also lives in exactly one process: a second API instance (for example for scaling) would have its own, different comments.
 ### Explain safe, idempotent and cacheable methods. Why is POST used for creating and why must DELETE be idempotent? What happens when a client retries a POST after a timeout, and what does that mean for the API?
 
 #### Safe Methods
@@ -779,15 +784,20 @@ curl -i localhost:3000/api/bears/unknown/comments
 curl -i -X DELETE localhost:3000/api/comments/unknown
 ```
 
-502 – (requires wrong Wikipedia Url)
+502 – Bad Gateway (start the API with a wrong Wikipedia hostname via the environment)
+```bash
+WIKIPEDIA_API_URL=https://en.wikipedia.invalid/w/api.php npm run dev -w apps/api
+```
 ```bash
 curl -i --max-time 10 localhost:3000/api/bears
 ```
+The same works with Docker: `WIKIPEDIA_API_URL=https://en.wikipedia.invalid/w/api.php docker compose up --build`. The UI then shows the `detail` of the problem ("Wikipedia API unreachable") instead of an empty list.
 
-500 – Internal Server Error (provoked)
+500 – Internal Server Error (provoked, own request id)
 ```bash
-curl -i localhost:3000/api/debug/provoke
+curl -i localhost:3000/api/debug/provoke -H 'x-request-id: demo-42'
 ```
+The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-42"`, and the API log contains a line with `"reqId":"demo-42"` and the full stack trace, which the client never sees. An invalid incoming id (longer than 128 characters or with characters outside `A-Z a-z 0-9 . _ -`) is replaced by a fresh UUID.
 
 ### Why should an API have exactly one error contract? Which information must never leave the server in an error, and how do request ids connect a user's complaint to a log line?
 
@@ -843,4 +853,28 @@ curl -i localhost:3000/api/debug/provoke
 
 - The browser only talks to its own origin, so there are no cross-origin requests, no preflights and no CORS headers.
 - The calls to upstream services are server-to-server, where CORS does not apply.
-- That is why the Vite proxy worked, and why the errors only appeared with `4173` → `3000`.
+- In this project the frontend uses relative URLs (`/api/...`) by default. In development the Vite proxy forwards them to the API, and in Docker nginx does the same (`location /api/` → `http://api:3000`). The browser sees only one origin, so no CORS is needed.
+- CORS only shows up when the frontend is built with an absolute API URL (`VITE_API_BASE_URL=http://localhost:3000`) and served from another origin (`4173`). Then every request goes `4173` → `3000`, and the API's allow-list decides.
+
+### Setup and demonstration
+
+#### CORS configuration from the environment
+- `CORS_ORIGINS` is a comma-separated allow-list, validated with zod at startup (`apps/api/src/config.ts`). Default: `http://localhost:4173,http://localhost:5173`. In `compose.yaml`, `http://localhost:8080` is added.
+- Allowed methods: `GET`, `POST`, `DELETE`. Allowed request headers: `content-type`, `x-request-id`. Exposed response headers: `x-request-id`, `location` (so the frontend can read them). Preflight results are cached for 600 s (`maxAge`).
+
+#### Observing the failing and the successful cross-origin request
+1. Start the API with an allow-list that does **not** contain the preview origin:
+   ```bash
+   CORS_ORIGINS=http://localhost:5173 npm run dev -w apps/api
+   ```
+2. Build the frontend with an absolute API URL and serve it on another origin:
+   ```bash
+   VITE_API_BASE_URL=http://localhost:3000 npm run build -w apps/web && npm run preview -w apps/web
+   ```
+3. Open `http://localhost:4173`: in DevTools the request to `/api/bears` fails with a CORS error (no `Access-Control-Allow-Origin` header).
+4. Restart the API with the default allow-list (`npm run dev -w apps/api`) and reload. Writing a comment shows an `OPTIONS` preflight (204 with `Access-Control-Allow-Methods`/`-Headers`), followed by the real JSON `POST` (201). Deleting a comment shows the same for `DELETE` (204).
+
+#### OpenAPI from zod
+- All route schemas (params, body, responses) are zod schemas, wired into Fastify with `fastify-type-provider-zod`. The same schemas validate requests, serialize responses and type the handlers.
+- `@fastify/swagger` turns them into an OpenAPI 3.1 document using `jsonSchemaTransform`. Schemas registered with `.meta({ id })` (`Bear`, `Comment`, `CreateComment`, `Problem`) appear as named components and are referenced via `$ref`. The library creates an input and an output variant of each.
+- `/api/docs` serves the Swagger UI (`/api/docs/json` the raw document). It lists every API route with its 4xx/5xx responses, which all point to the `Problem` schema.

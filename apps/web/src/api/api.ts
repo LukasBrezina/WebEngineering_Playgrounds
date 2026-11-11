@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'http://localhost:3000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export class ApiError extends Error {
   constructor(
@@ -10,6 +10,9 @@ export class ApiError extends Error {
   }
 }
 
+// Error flow: API answers 4xx/5xx with Problem Details -> checkResponseOk throws ApiError(detail, status, requestId)
+// -> the component's catch calls errorMessage(e, fallback): ApiError -> detail, anything else (network/CORS) -> fallback
+// -> the message is put into the error state and rendered as <p role="alert">.
 export async function checkResponseOk(res: Response): Promise<Response> {
   if (res.ok) return res;
   const isProblem = (res.headers.get('content-type') ?? '').includes(

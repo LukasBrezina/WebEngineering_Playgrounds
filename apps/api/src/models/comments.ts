@@ -1,21 +1,34 @@
-export interface Comment {
-  id: string;
-  author: string;
-  text: string;
-  bearId: string;
-  createdAt: string;
-}
+import { z } from 'zod';
 
+const AUTHOR_MAX = 100;
+const TEXT_MAX = 1000;
+
+export const CreateCommentSchema = z
+  .strictObject({
+    author: z
+      .string({ error: 'Author is required' })
+      .trim()
+      .min(1, 'Author must not be empty')
+      .max(AUTHOR_MAX, `Author must be at most ${AUTHOR_MAX} characters`),
+    text: z
+      .string({ error: 'Comment is required' })
+      .trim()
+      .min(1, 'Comment must not be empty')
+      .max(TEXT_MAX, `Comment must be at most ${TEXT_MAX} characters`),
+  })
+  .meta({ id: 'CreateComment' });
+
+export const CommentSchema = z
+  .object({
+    id: z.uuid(),
+    bearId: z.string(),
+    author: z.string(),
+    text: z.string(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: 'Comment' });
+
+export type Comment = z.infer<typeof CommentSchema>;
+
+// In-memory store: lives in the API process, so it is gone after a restart
 export const comments = new Map<string, Comment>();
-
-export const createComment = {
-  body: {
-    type: 'object',
-    required: ['author', 'text'],
-    additionalProperties: false,
-    properties: {
-      author: { type: 'string', minLength: 1, maxLength: 100, pattern: '\\S' },
-      text: { type: 'string', minLength: 1, maxLength: 1000, pattern: '\\S' },
-    },
-  },
-};

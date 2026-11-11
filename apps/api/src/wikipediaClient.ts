@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { UpstreamError, UpstreamTimeoutError } from './errors.js';
+import { config } from './config.js';
 
-const BASE_URL = 'https://en.wikipedia.org/w/api.php';
+const BASE_URL = config.WIKIPEDIA_API_URL;
 const USER_AGENT =
   'WebEngineeringPlaygrounds/0.1 (https://github.com/LukasBrezina/WebEngineering_Playgrounds; educational course project, low traffic)';
 const TIMEOUT_MS = 5000;

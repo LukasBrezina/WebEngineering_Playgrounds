@@ -1,42 +1,70 @@
 import Fastify, { type FastifyError } from 'fastify';
 import { readFileSync } from 'node:fs';
-import { getBears } from './bears.js';
 import { randomUUID } from 'node:crypto';
-import { type Comment, comments, createComment } from './models/comments.js';
-import { HttpError, NotFoundError } from './errors.js';
 import { STATUS_CODES } from 'node:http';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import { bearSchema, commentSchema, problem } from './models/swaggerSchemas.js';
+import {
+  jsonSchemaTransform,
+  jsonSchemaTransformObject,
+  serializerCompiler,
+  validatorCompiler,
+  type ZodTypeProvider,
+} from 'fastify-type-provider-zod';
+import { z } from 'zod';
+import { config } from './config.js';
+import { getBears } from './bears.js';
+import { BearSchema } from './models/bear.js';
+import {
+  type Comment,
+  CommentSchema,
+  comments,
+  CreateCommentSchema,
+} from './models/comments.js';
+import { type Problem, ProblemSchema } from './models/problem.js';
+import { HttpError, NotFoundError } from './errors.js';
 
 const { version } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 ) as { version: string };
 
+// only accept requestId of this pattern
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
+
 const app = Fastify({
   logger: true,
-  requestIdHeader: 'x-request-id',
-  genReqId: () => randomUUID(),
-});
+  requestIdHeader: false,
+  genReqId: (req) => {
+    const incoming = req.headers['x-request-id'];
+    return typeof incoming === 'string' && REQUEST_ID_PATTERN.test(incoming)
+      ? incoming
+      : randomUUID();
+  },
+}).withTypeProvider<ZodTypeProvider>();
 
+// validates params/body before the handler runs (failure -> err.validation -> 400)
+// and checks every response against its zod schema before it is sent.
+app.setValidatorCompiler(validatorCompiler);
+app.setSerializerCompiler(serializerCompiler);
+
+// register() loads a plugin (hooks/routes); await = ready before the routes below are defined.
 await app.register(cors, {
-  origin: ['http://localhost:4173', 'http://localhost:5173'],
+  origin: config.CORS_ORIGINS,
   methods: ['GET', 'POST', 'DELETE'],
   allowedHeaders: ['content-type', 'x-request-id'],
   exposedHeaders: ['x-request-id', 'location'],
   maxAge: 600,
 });
 
-app.addSchema(problem);
-app.addSchema(commentSchema);
-app.addSchema(bearSchema);
-
 await app.register(swagger, {
   openapi: { openapi: '3.1.0', info: { title: 'Bears API', version } },
+  transform: jsonSchemaTransform,
+  transformObject: jsonSchemaTransformObject,
 });
 await app.register(swaggerUi, { routePrefix: '/api/docs' });
 
+// runs first for every request -> puts the request id into the x-request-id header.
 app.addHook('onRequest', async (req, reply) => {
   void reply.header('x-request-id', req.id);
 });
@@ -45,6 +73,9 @@ app.setNotFoundHandler(async (req) => {
   throw new NotFoundError(`Route ${req.method} ${req.url}`);
 });
 
+// Central error handler: turns every error into RFC 9457 Problem Details (application/problem+json).
+// Status from HttpError / validation (400) / Fastify (max 500); logs with reqId; field errors in `errors`.
+// Unexpected errors only get a generic "Internal Server Error", details stay in the log.
 app.setErrorHandler((err: FastifyError | HttpError, req, reply) => {
   const validation = 'validation' in err ? err.validation : undefined;
   const status =
@@ -60,54 +91,53 @@ app.setErrorHandler((err: FastifyError | HttpError, req, reply) => {
     'request failed'
   );
 
-  const expected = status < 500 || err instanceof HttpError;
-  return reply
-    .code(status)
-    .type('application/problem+json')
-    .send({
-      type: 'about:blank',
-      title: err instanceof HttpError ? err.title : STATUS_CODES[status],
-      status,
-      detail: expected ? err.message : 'Internal Server Error',
-      instance: `urn:request:${req.id}`,
-      errors: validation?.map((v) => ({
-        pointer: v.instancePath,
-        message: v.message,
-      })),
-    });
+  const errors = validation?.map((v) => ({
+    pointer: v.instancePath,
+    message: v.message ?? 'Invalid value',
+  }));
+
+  let detail = 'Internal Server Error';
+  if (errors !== undefined) detail = errors.map((e) => e.message).join('; ');
+  else if (status < 500 || err instanceof HttpError) detail = err.message;
+
+  const problem: Problem = {
+    type: 'about:blank',
+    title: err instanceof HttpError ? err.title : (STATUS_CODES[status] ?? ''),
+    status,
+    detail,
+    instance: `urn:request:${req.id}`,
+    errors,
+  };
+  return reply.code(status).type('application/problem+json').send(problem);
 });
 
-const problemRef = { $ref: 'Problem#' };
+const upstreamProblems = { 502: ProblemSchema, 504: ProblemSchema };
+const BearParams = z.object({ id: z.string() });
 
-const health = async (): Promise<object> => ({
+const HealthSchema = z.object({
+  status: z.literal('ok'),
+  version: z.string(),
+  uptime: z.number(),
+});
+const health = async (): Promise<z.infer<typeof HealthSchema>> => ({
   status: 'ok',
   version,
   uptime: process.uptime(),
 });
-const healthSchema = {
-  tags: ['health'],
-  response: {
-    200: {
-      type: 'object',
-      properties: {
-        status: { type: 'string' },
-        version: { type: 'string' },
-        uptime: { type: 'number' },
-      },
-    },
-  },
-};
-app.get('/health', { schema: { ...healthSchema, hide: true } }, health);
-app.get('/api/health', { schema: healthSchema }, health);
+app.get(
+  '/health',
+  { schema: { hide: true, response: { 200: HealthSchema } } },
+  health
+);
+app.get(
+  '/api/health',
+  { schema: { tags: ['health'], response: { 200: HealthSchema } } },
+  health
+);
 
 const requireBear = async (id: string): Promise<void> => {
   if (!(await getBears()).some((b) => b.id === id))
     throw new NotFoundError('Bear');
-};
-
-const bearIdParams = {
-  type: 'object',
-  properties: { id: { type: 'string' } },
 };
 
 app.get(
@@ -115,27 +145,19 @@ app.get(
   {
     schema: {
       tags: ['bears'],
-      response: {
-        200: { type: 'array', items: { $ref: 'Bear#' } },
-        502: problemRef,
-        504: problemRef,
-      },
+      response: { 200: z.array(BearSchema), ...upstreamProblems },
     },
   },
   async () => await getBears()
 );
 
-app.get<{ Params: { id: string } }>(
+app.get(
   '/api/bears/:id',
   {
     schema: {
       tags: ['bears'],
-      response: {
-        200: { $ref: 'Bear#' },
-        404: problemRef,
-        502: problemRef,
-        504: problemRef,
-      },
+      params: BearParams,
+      response: { 200: BearSchema, 404: ProblemSchema, ...upstreamProblems },
     },
   },
   async ({ params }) => {
@@ -145,17 +167,16 @@ app.get<{ Params: { id: string } }>(
   }
 );
 
-app.get<{ Params: { id: string } }>(
+app.get(
   '/api/bears/:id/comments',
   {
     schema: {
-      params: bearIdParams,
       tags: ['comments'],
+      params: BearParams,
       response: {
-        200: { type: 'array', items: { $ref: 'Comment#' } },
-        404: problemRef,
-        502: problemRef,
-        504: problemRef,
+        200: z.array(CommentSchema),
+        404: ProblemSchema,
+        ...upstreamProblems,
       },
     },
   },
@@ -165,19 +186,18 @@ app.get<{ Params: { id: string } }>(
   }
 );
 
-app.post<{ Params: { id: string }; Body: { author: string; text: string } }>(
+app.post(
   '/api/bears/:id/comments',
   {
     schema: {
-      ...createComment,
-      params: bearIdParams,
       tags: ['comments'],
+      params: BearParams,
+      body: CreateCommentSchema,
       response: {
-        201: { $ref: 'Comment#' },
-        400: problemRef,
-        404: problemRef,
-        502: problemRef,
-        504: problemRef,
+        201: CommentSchema,
+        400: ProblemSchema,
+        404: ProblemSchema,
+        ...upstreamProblems,
       },
     },
   },
@@ -186,8 +206,8 @@ app.post<{ Params: { id: string }; Body: { author: string; text: string } }>(
     const comment: Comment = {
       id: randomUUID(),
       bearId: params.id,
-      author: body.author.trim(),
-      text: body.text.trim(),
+      author: body.author,
+      text: body.text,
       createdAt: new Date().toISOString(),
     };
     comments.set(comment.id, comment);
@@ -198,12 +218,13 @@ app.post<{ Params: { id: string }; Body: { author: string; text: string } }>(
   }
 );
 
-app.delete<{ Params: { commentId: string } }>(
+app.delete(
   '/api/comments/:commentId',
   {
     schema: {
       tags: ['comments'],
-      response: { 204: { type: 'null' }, 404: problemRef },
+      params: z.object({ commentId: z.string() }),
+      response: { 204: z.undefined(), 404: ProblemSchema },
     },
   },
   async ({ params }, reply) => {
@@ -212,8 +233,9 @@ app.delete<{ Params: { commentId: string } }>(
   }
 );
 
+// demonstration purpose (provoked 500)
 app.get('/api/debug/provoke', { schema: { hide: true } }, async () => {
   throw new Error('Provoked 500');
 });
 
-await app.listen({ port: 3000, host: '0.0.0.0' });
+await app.listen({ port: config.PORT, host: config.HOST });
