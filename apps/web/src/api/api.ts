@@ -28,5 +28,9 @@ export async function checkResponseOk(res: Response): Promise<Response> {
   );
 }
 
-export const errorMessage = (e: unknown, fallback: string): string =>
-  e instanceof ApiError ? e.message : fallback;
+export const errorMessage = (e: unknown, fallback: string): string => {
+  if (!(e instanceof ApiError)) return fallback;
+  return e.requestId === undefined
+    ? e.message
+    : `${e.message} (Request ID: ${e.requestId})`;
+};

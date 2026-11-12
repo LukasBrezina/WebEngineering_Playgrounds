@@ -126,7 +126,7 @@ const health = async (): Promise<z.infer<typeof HealthSchema>> => ({
 });
 app.get(
   '/health',
-  { schema: { hide: true, response: { 200: HealthSchema } } },
+  { schema: { tags: ['health'], response: { 200: HealthSchema } } },
   health
 );
 app.get(

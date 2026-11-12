@@ -3,14 +3,14 @@ import { Highlight } from './Highlight.js';
 import { useParams } from 'react-router-dom';
 import { type Bear } from '../../models/bear.js';
 import { fetchBear } from '../../api/bears.js';
-import { errorMessage } from '../../api/api.js';
+import { ApiError, errorMessage } from '../../api/api.js';
 import { BackButton } from './BackButton.js';
 import { Comments } from './Comments.js';
 
 type DetailState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'notFound' }
+  | { status: 'notFound'; message: string }
   | { status: 'success'; bear: Bear };
 
 export function BearDetail(): React.JSX.Element {
@@ -23,16 +23,18 @@ export function BearDetail(): React.JSX.Element {
 
     fetchBear(bearId ?? '', controller.signal)
       .then((bear) => {
-        setState(
-          bear === null ? { status: 'notFound' } : { status: 'success', bear }
-        );
+        setState({ status: 'success', bear });
       })
       .catch((e: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'error',
-            message: errorMessage(e, 'Could not load bear.'),
-          });
+        if (controller.signal.aborted) return;
+        if (e instanceof ApiError && e.status === 404) {
+          setState({ status: 'notFound', message: e.message });
+          return;
+        }
+        setState({
+          status: 'error',
+          message: errorMessage(e, 'Could not load bear.'),
+        });
       });
 
     return () => {
@@ -60,7 +62,7 @@ export function BearDetail(): React.JSX.Element {
     if (state.status === 'notFound') {
       return (
         <>
-          <p>Bear not found.</p>
+          <p>{state.message}</p>
           <BackButton />
         </>
       );
