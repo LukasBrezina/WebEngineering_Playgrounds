@@ -639,6 +639,18 @@ An operation is **idempotent** if running it multiple times with the same input 
 
 ### Explain Node's event loop on the server: why does one slow synchronous operation delay every concurrent request, and how does async I/O avoid that? What is a health endpoint for, and who calls it?
 
+#### Event loop in detail: call stack, queues and `await`
+- **Call stack:** the code that is running right now. One thread, so only one thing at a time.
+- **Microtask queue:** promise continuations (`.then` callbacks and the code after `await`). In Node, `process.nextTick` runs even before them.
+- **Task queue (macrotasks):** timers (`setTimeout`), I/O callbacks (network, disk), events.
+- **Event loop order:** run the current synchronous code until the call stack is empty → run **all** microtasks → take **one** task (e.g. the next incoming request) → microtasks again → …
+- An `async` function runs synchronously up to its first `await`. If the awaited promise is still pending, the function pauses and returns a pending promise to its caller, and the caller continues synchronously.
+- If the caller also uses `await`, it pauses too, so the pausing moves up the stack until it reaches a caller that does not wait (in this project: Fastify, which was called by the event loop for an incoming request).
+- The code after `await` runs **at the earliest** when the current call stack is empty, and **only** when the promise has settled. It is not "after all synchronous code in the codebase": only the rest of the current call stack runs first. With a pending `fetch`, many other tasks (other requests, each with their own synchronous code) can run before the continuation.
+- **In this project:** request A reaches `await fetch(...)` in `getBears()`. The handler pauses, Fastify gets a promise back, the stack is empty. The event loop picks up request B (for example `/health`) and answers it immediately. When Wikipedia answers, the promise settles, and the continuation of request A is queued as a microtask and finishes the response.
+- If `getBears()` were synchronous (a blocking HTTP call), the single thread would wait about 1.3 s for Wikipedia, and no other request, not even `/health`, could be answered during that time.
+
+
 #### Why one slow synchronous operation delays every request
 - Node runs your JavaScript on a single thread. The event loop takes one callback from the queue, runs it to completion, then takes the next.
 - A synchronous operation (huge `JSON.parse`, `readFileSync`, a CPU-heavy loop) holds that thread. No other callback can run, so all concurrent requests wait, even a trivial `/health`.
@@ -845,9 +857,10 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 
 #### Why `*` and credentials don't mix
 
-- `*` means "any site may read this response".
-- With cookies, any malicious site could then act as the logged-in user and read private data.
-- So the browser rejects it. The server must send one explicit origin plus `Access-Control-Allow-Credentials: true`. That is why you use an origin allow-list.
+- **Credentials** = cookies, HTTP auth, client certificates. The browser sends them automatically with the request.
+- **`*`** = "public, any site may read this response". A credentialed response is personal, so `*` would let any site read the user's private data (e.g. `evil.example` fetches `bank.example/api/account` with the user's cookie and reads the answer).
+- So the browser blocks this combination. The server must send one explicit origin + `Access-Control-Allow-Credentials: true` (+ `Vary: Origin`).
+- Echoing back every origin is just as bad as `*`, which is why an **allow-list** is used (here: `CORS_ORIGINS`).
 
 #### Why a BFF removes most CORS problems
 
