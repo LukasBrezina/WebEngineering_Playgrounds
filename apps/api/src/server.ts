@@ -14,7 +14,7 @@ import {
 } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { config } from './config.js';
-import { getBears } from './bears.js';
+import { findBear, listBears } from './bears.js';
 import { BearSchema } from './models/bear.js';
 import {
   type Comment,
@@ -116,7 +116,6 @@ app.setErrorHandler((err: FastifyError | HttpError, req, reply) => {
   return reply.code(status).type('application/problem+json').send(problem);
 });
 
-const upstreamProblems = { 502: ProblemSchema, 504: ProblemSchema };
 const BearParams = z.object({ id: z.string() });
 
 const HealthSchema = z.object({
@@ -162,8 +161,7 @@ app.get(
 );
 
 const requireBear = async (id: string): Promise<void> => {
-  if (!(await getBears()).some((b) => b.id === id))
-    throw new NotFoundError('Bear');
+  if ((await findBear(id)) === undefined) throw new NotFoundError('Bear');
 };
 
 app.get(
@@ -171,10 +169,10 @@ app.get(
   {
     schema: {
       tags: ['bears'],
-      response: { 200: z.array(BearSchema), ...upstreamProblems },
+      response: { 200: z.array(BearSchema) },
     },
   },
-  async () => await getBears()
+  async () => await listBears()
 );
 
 app.get(
@@ -183,11 +181,11 @@ app.get(
     schema: {
       tags: ['bears'],
       params: BearParams,
-      response: { 200: BearSchema, 404: ProblemSchema, ...upstreamProblems },
+      response: { 200: BearSchema, 404: ProblemSchema },
     },
   },
   async ({ params }) => {
-    const bear = (await getBears()).find((b) => b.id === params.id);
+    const bear = await findBear(params.id);
     if (bear === undefined) throw new NotFoundError('Bear');
     return bear;
   }
@@ -202,7 +200,6 @@ app.get(
       response: {
         200: z.array(CommentSchema),
         404: ProblemSchema,
-        ...upstreamProblems,
       },
     },
   },
@@ -223,7 +220,6 @@ app.post(
         201: CommentSchema,
         400: ProblemSchema,
         404: ProblemSchema,
-        ...upstreamProblems,
       },
     },
   },

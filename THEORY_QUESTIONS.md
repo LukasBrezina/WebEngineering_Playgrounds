@@ -25,6 +25,7 @@
   - [Task 5](#task-5--cors-and-the-api-contract)
 - [Playground 5](#playground-5)
   - [Task 1](#task-1--add-postgresql-to-the-stack)
+  - [Task 2](#task-2--model-bears-and-comments-and-write-the-first-migration)
 
 # Playground 1
 
@@ -934,3 +935,46 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 - **Bigger is not faster:** a small pool (here `DB_POOL_MAX`, default 10) often gives higher throughput than a large one. A common starting point is about `cores × 2` on the database server.
 - **Application side:** Node is single-threaded, so a single process rarely needs many parallel connections. Long transactions or slow queries hold connections and empty the pool faster.
 - **Scaling beyond:** with many instances, a connection pooler such as PgBouncer sits in front of PostgreSQL and multiplexes many client connections onto few database connections.
+
+## Task 2 – Model bears and comments and write the first migration
+
+### Why migrations instead of creating tables from code at startup? What does forward-only mean, and what goes wrong when two branches both create migration 0003? Natural key (slug) versus surrogate key (uuid): when is which appropriate?
+
+#### Why migrations instead of creating tables at startup
+- **Versioned history:** every schema change is a numbered SQL file in the repository (here `apps/api/src/db/drizzle/0000_*.sql`). The schema is reviewed, diffed and versioned together with the code that needs it.
+- **Reproducible:** every environment (local, CI, Docker, production) runs exactly the same steps in the same order and ends with the same schema.
+- **Tracked state:** the database itself records which migrations were applied (`drizzle.__drizzle_migrations`). Each migration runs exactly once, so `db:migrate` can be run again and again safely.
+- **Changing existing data:** `CREATE TABLE IF NOT EXISTS` at startup only works for an empty database. It cannot rename a column, add a `NOT NULL` column to a table with data, or move data. A migration can do all of that step by step.
+- **No accidental changes:** code that "syncs" the schema on startup can silently drop or change columns in production. A migration is an explicit, reviewed step.
+- **Separation:** the API only runs queries, it does not decide the schema. Migrations run as a separate step before the server starts (here: `migrate.js && seed.js && server.js` in `compose.yaml`).
+
+#### Forward-only
+- Migrations are only ever **added**, never edited or deleted once they were applied somewhere (shared branch, CI, production).
+- A mistake is fixed with a **new** migration (e.g. `0004_fix_column`), not by changing `0003`.
+- Reason: a database that already ran the old version of `0003` would never run the changed version again, so environments drift apart. Drizzle also stores a hash, and an edited migration can break the history check.
+- Down migrations (rollback) are often skipped, because undoing a migration that dropped data is impossible anyway. Rolling back means: deploy the old code, and repair with a new forward migration.
+
+#### Two branches both create migration 0003
+- Branch A creates `0003_add_report_count.sql`, branch B creates `0003_add_users.sql`, both based on `0002`.
+- **Conflicts after the merge:**
+  - Two files with the same number: the order is unclear, and the migration journal (`meta/_journal.json`) and snapshots conflict.
+  - Each snapshot only knows its own branch, so the next `drizzle-kit generate` produces wrong diffs (it may try to create or drop the other branch's changes again).
+  - A database that already ran A's `0003` (e.g. a shared dev database) has recorded "0003 done" and may skip B's `0003`, or the run fails because the history does not match.
+  - If both touch the same table or column, the result depends on the order.
+- **How to solve it:**
+  - Before merging, rebase on main, delete your own unmerged migration and run `drizzle-kit generate` again, so it becomes `0004` and is based on the merged schema.
+  - Generate migrations late (just before merging) and keep migration PRs small.
+  - CI check: run all migrations on an empty database and check that `drizzle-kit generate` produces no new changes.
+
+#### Natural key (slug) vs. surrogate key (uuid)
+- **Natural key:** a value that has a meaning in the domain and identifies the row anyway, here the bear slug (`u-arctos`, derived from the binomial).
+  - Readable, can be used directly in URLs (`/api/bears/u-arctos`), no extra lookup column needed.
+  - The seed can **upsert** on it (`ON CONFLICT (id)`), because the same bear always gets the same id.
+  - Risk: if the value changes (renamed species, new slug rule), the primary key and every foreign key that points to it must change.
+  - Appropriate when the value is **stable, unique and comes from the domain**, as for a small, curated set like bear species.
+- **Surrogate key:** a generated value without meaning, here `comments.id` as `uuid` (`gen_random_uuid()`).
+  - Never changes, because it is independent of the content. Author or text can be edited without touching the key.
+  - Can be generated without coordination (in the database or in the app), and a UUID does not reveal how many rows exist or allow guessing the next id (unlike `1, 2, 3`).
+  - Downsides: larger than an integer, not readable, and random UUIDs spread inserts across the index (UUIDv7 is time-ordered and avoids this).
+  - Appropriate for **entities created by users** with no natural unique attribute, like comments.
+- **In this project:** `bears.id` is a natural key (slug), `binomial` is additionally `UNIQUE`. `comments.id` is a surrogate key (uuid), and `comments.bear_id` references the slug with `ON DELETE CASCADE`.
