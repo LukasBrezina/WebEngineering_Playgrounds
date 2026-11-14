@@ -29,6 +29,3 @@ export const CommentSchema = z
   .meta({ id: 'Comment' });
 
 export type Comment = z.infer<typeof CommentSchema>;
-
-// In-memory store: lives in the API process, so it is gone after a restart
-export const comments = new Map<string, Comment>();

@@ -26,6 +26,7 @@
 - [Playground 5](#playground-5)
   - [Task 1](#task-1--add-postgresql-to-the-stack)
   - [Task 2](#task-2--model-bears-and-comments-and-write-the-first-migration)
+  - [Task 3](#task-3--introduce-a-repository-layer)
 
 # Playground 1
 
@@ -978,3 +979,51 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
   - Downsides: larger than an integer, not readable, and random UUIDs spread inserts across the index (UUIDv7 is time-ordered and avoids this).
   - Appropriate for **entities created by users** with no natural unique attribute, like comments.
 - **In this project:** `bears.id` is a natural key (slug), `binomial` is additionally `UNIQUE`. `comments.id` is a surrogate key (uuid), and `comments.bear_id` references the slug with `ON DELETE CASCADE`.
+
+## Task 3 – Introduce a repository layer
+
+### What does the repository hide, and what does it cost? Explain the N+1 problem using "comments for all bears" and show how your repository avoids it.
+
+#### What the repository hides
+- **The storage technology:** route handlers only know `BearRepository` and `CommentRepository` (`apps/api/src/repositories/types.ts`). Whether the data comes from PostgreSQL (`drizzle.ts`) or a `Map` (`test/memory.ts`) is invisible to them.
+- **The query language:** SQL, Drizzle calls, `WHERE`, `ORDER BY`, `RETURNING` all live in `drizzle.ts`. The handlers in `app.ts` contain no SQL and no ORM calls.
+- **Mapping between database and API shape:** column names (`bear_id`, `created_at`) and types (`Date` → ISO string) are converted in `toComment()`. The API only sees the `Comment` type.
+- **Database details and errors:** e.g. an id that is not a uuid would make PostgreSQL fail. The repository returns `false` ("not found"), so the route answers 404 instead of 500.
+- **Where it is wired together:** only `server.ts` (the composition root) creates the Drizzle implementation and injects it via `buildApp({ repos })` and the Fastify decorator `app.repos`. The tests inject the in-memory implementation.
+
+#### Benefits
+- **Testability:** the test suite (`app.test.ts`) runs against the in-memory repositories with `app.inject()`, no database needed, fast and deterministic.
+- **Exchangeability:** the storage can change (other ORM, other database, a cache in front) without touching the routes.
+- **Separation of concerns:** HTTP (status codes, validation, Problem Details) in the routes, data access in the repository.
+- **One place per query:** a query can be optimised (index, columns, order) in one place, instead of being copied into several handlers.
+
+#### What it costs
+- **More code and indirection:** an interface, two implementations and the wiring. For a small app this is noticeably more code than calling Drizzle in the handler.
+- **Leaky abstraction:** the interface hides *how* data is loaded, so it also hides *how expensive* a call is. A harmless-looking `listByBear()` in a loop is one query per call (see N+1).
+- **Lowest common denominator:** features of PostgreSQL (joins, transactions, `FOR UPDATE`, full-text search) must be exposed through the interface on purpose, otherwise they are out of reach. Every new query needs a new method.
+- **Two implementations must stay in sync:** the in-memory version can behave differently from PostgreSQL (ordering, uniqueness, foreign keys, uuid validation, transactions). Tests can pass in memory and the real database can still fail, so a few integration tests against PostgreSQL are still useful.
+- **Transactions across repositories:** a use case that writes into several repositories needs a shared transaction, which the interfaces have to support explicitly.
+
+#### The N+1 problem: "comments for all bears"
+- **Naive version:** load all bears (1 query), then load the comments for each bear in a loop:
+  ```ts
+  const bears = await repos.bears.list();                   // 1 query
+  for (const bear of bears) {
+    bear.comments = await repos.comments.listByBear(bear.id); // N queries
+  }
+  ```
+- With 8 bears this is 1 + 8 = **9 queries**, with 1,000 bears 1,001. Every query costs a network round trip, a connection from the pool and planning time in PostgreSQL. The total time grows linearly with N, although the data would fit into one answer.
+- The code looks harmless, because the repository hides that each call is a separate query. ORMs with lazy loading (`bear.comments` loads on access) produce the same problem implicitly.
+
+#### How the repository avoids it
+- **Every route needs exactly one query per request:**
+  - `GET /api/bears` → one `SELECT` on `bears` (`list()`).
+  - `GET /api/bears/:id/comments` → one `SELECT … WHERE bear_id = $1 ORDER BY created_at, id` (`listByBear()`), supported by the index on `(bear_id, created_at)`.
+  - No route loads comments per bear in a loop, and the interface has no lazy loading, so there is no hidden query behind a property access.
+- **If "comments for all bears" is needed**, the fix is a set-based method in the repository instead of a loop in the caller, so the query count stays constant (1 or 2) regardless of N:
+  - **Batch query:** one query for all bears, one for all their comments, grouped in code:
+    ```sql
+    SELECT * FROM comments WHERE bear_id = ANY($1) ORDER BY bear_id, created_at;
+    ```
+  - **Join or aggregation:** one query that returns bears with their comments (`LEFT JOIN comments ON comments.bear_id = bears.id`, or `json_agg` per bear).
+- **Rule:** the repository offers methods that match the use case ("comments for these bears"), not only "one entity at a time". The caller never loops over repository calls.

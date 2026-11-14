@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { fetchBearsFromWikipedia } from '../bears.js';
+import { fetchBearsFromWikipedia } from '../source/bears.js';
 import { db, pool } from '../db.js';
 import { bears } from './schema.js';
 

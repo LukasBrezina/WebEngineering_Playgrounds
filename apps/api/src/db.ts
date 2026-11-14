@@ -14,3 +14,5 @@ pool.on('error', (err) => {
 });
 
 export const db = drizzle(pool, { schema });
+
+export type Database = typeof db;

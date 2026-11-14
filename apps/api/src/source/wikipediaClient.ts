@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { UpstreamError, UpstreamTimeoutError } from './errors.js';
-import { config } from './config.js';
+import { UpstreamError, UpstreamTimeoutError } from '../errors/errors.js';
+import { config } from '../config.js';
 
 const BASE_URL = config.WIKIPEDIA_API_URL;
 const USER_AGENT =

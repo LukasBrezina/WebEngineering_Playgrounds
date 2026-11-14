@@ -1,9 +1,6 @@
-import { type Bear, BearsSchema, type ParsedBear } from './models/bear.js';
+import { type Bear, BearsSchema, type ParsedBear } from '../models/bear.js';
 import { fetchBearWikitext, fetchImageUrl } from './wikipediaClient.js';
-import { UpstreamError } from './errors.js';
-import { asc, eq } from 'drizzle-orm';
-import { db } from './db.js';
-import { bears } from './db/schema.js';
+import { UpstreamError } from '../errors/errors.js';
 
 export async function fetchBearsFromWikipedia(): Promise<Bear[]> {
   const bears = await parseBears(await fetchBearWikitext());
@@ -60,24 +57,3 @@ const formatStringToId = (value: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-
-const bearColumns = {
-  id: bears.id,
-  name: bears.name,
-  binomial: bears.binomial,
-  imageUrl: bears.imageUrl,
-  range: bears.range,
-};
-
-export async function listBears(): Promise<Bear[]> {
-  return await db.select(bearColumns).from(bears).orderBy(asc(bears.name));
-}
-
-export async function findBear(id: string): Promise<Bear | undefined> {
-  const [bear] = await db
-    .select(bearColumns)
-    .from(bears)
-    .where(eq(bears.id, id))
-    .limit(1);
-  return bear;
-}
