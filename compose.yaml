@@ -1,4 +1,19 @@
 services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-web}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-web}
+      POSTGRES_DB: ${POSTGRES_DB:-web}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 3s
+      retries: 10
   api:
     build:
       context: .
@@ -6,6 +21,7 @@ services:
     environment:
       WIKIPEDIA_API_URL: ${WIKIPEDIA_API_URL:-https://en.wikipedia.org/w/api.php}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:4173,http://localhost:5173}
+      DATABASE_URL: postgres://${POSTGRES_USER:-web}:${POSTGRES_PASSWORD:-web}@db:5432/${POSTGRES_DB:-web}
     ports:
       - '3000:3000'
     healthcheck:
@@ -13,6 +29,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    depends_on:
+      db:
+        condition: service_healthy
   web:
     build:
       context: .
@@ -22,3 +41,5 @@ services:
     depends_on:
       api:
         condition: service_healthy
+volumes:
+  pgdata:

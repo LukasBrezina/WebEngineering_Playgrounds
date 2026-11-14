@@ -23,6 +23,8 @@
   - [Task 3](#task-3--design-the-comments-api)
   - [Task 4](#task-4--one-error-format-for-everything)
   - [Task 5](#task-5--cors-and-the-api-contract)
+- [Playground 5](#playground-5)
+  - [Task 1](#task-1--add-postgresql-to-the-stack)
 
 # Playground 1
 
@@ -891,3 +893,44 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 - All route schemas (params, body, responses) are zod schemas, wired into Fastify with `fastify-type-provider-zod`. The same schemas validate requests, serialize responses and type the handlers.
 - `@fastify/swagger` turns them into an OpenAPI 3.1 document using `jsonSchemaTransform`. Schemas registered with `.meta({ id })` (`Bear`, `Comment`, `CreateComment`, `Problem`) appear as named components and are referenced via `$ref`. The library creates an input and an output variant of each.
 - `/api/docs` serves the Swagger UI (`/api/docs/json` the raw document). It lists every API route with its 4xx/5xx responses, which all point to the `Problem` schema.
+# Playground 5
+
+## Task 1 – Add PostgreSQL to the stack
+
+### Liveness versus readiness: who uses each, and what goes wrong if the readiness check includes too many dependencies? Why is a connection pool necessary, and what limits its size?
+
+#### Liveness (`/health`)
+- Answers "is this process alive and is its event loop responsive?"
+- Checks nothing external, only that the process can answer a request (here: status, version, uptime).
+- **Who uses it:** the orchestrator (Docker healthcheck, Kubernetes liveness probe).
+- **Consequence on failure:** the container is restarted, because a restart is the only thing that helps a hung or deadlocked process.
+- Must stay cheap and independent of dependencies. Otherwise a database outage would make every API container restart in a loop, although restarting does not fix the database.
+
+#### Readiness (`/health/ready`)
+- Answers "can this instance serve real traffic right now?"
+- Checks the dependencies the instance cannot work without (here: `SELECT 1` against PostgreSQL through the pool). Returns 200 if the database answers, otherwise a 503 Problem.
+- **Who uses it:** load balancers, Kubernetes readiness probes, rolling deployments, `depends_on: condition: service_healthy` in Compose.
+- **Consequence on failure:** the instance is taken out of the load balancer (no traffic), but **not** restarted. As soon as the check passes again, it gets traffic again.
+- Useful during startup (pool not ready, migrations still running) and during short database outages.
+
+#### What goes wrong with too many dependencies in the readiness check
+- **Cascading failure:** if the check also includes optional or external services (e.g. Wikipedia), a short outage there marks **all** instances as not ready at the same time. The load balancer then has no healthy instance left, and the whole API is down, although most routes (e.g. comments) would still work.
+- **Shared dependency = shared fate:** every instance checks the same dependency, so they all fail together. Readiness is meant to take out *one* broken instance, not the whole fleet.
+- **Flapping:** slow or unstable dependencies make instances go in and out of the load balancer.
+- **Load amplification:** every probe of every instance hits every dependency. Expensive checks (real queries, upstream HTTP calls) add load exactly when the system is already under stress.
+- **Slow probes:** each additional network call adds latency, and probes may time out even though the instance itself is fine.
+- **Rule of thumb:** only check what this instance strictly needs to serve requests (here: its own database). Optional upstreams are handled per request (502/504, fallback, cache), not in the readiness check.
+
+#### Why a connection pool is necessary
+- Opening a PostgreSQL connection is expensive: TCP handshake, TLS, authentication, and PostgreSQL forks a dedicated **backend process** per connection (several MB of RAM each).
+- A connection per request would add this cost to every request (milliseconds of latency) and, under load, open hundreds of connections until `max_connections` is reached and new requests fail.
+- A pool opens a limited number of connections once and **reuses** them. A request borrows a connection, runs its query and returns it.
+- If all connections are in use, further requests **wait** in the pool's queue (here at most `connectionTimeoutMillis: 2000`) instead of overloading the database. This is natural backpressure.
+- In this project: exactly one `pg.Pool` per process (`apps/api/src/db.ts`), shared by all requests, closed on shutdown (`onClose` → `pool.end()`).
+
+#### What limits the pool size
+- **PostgreSQL's `max_connections`** (default 100), shared by **all** clients: every API instance, the worker, migrations, admin tools. Rule: `instances × pool max + others ≤ max_connections` (with some reserve).
+- **Database resources:** every connection is a process with its own memory. CPU cores and disk I/O decide how many queries can really run in parallel. More connections than that only create contention (locks, context switches) and make each query slower.
+- **Bigger is not faster:** a small pool (here `DB_POOL_MAX`, default 10) often gives higher throughput than a large one. A common starting point is about `cores × 2` on the database server.
+- **Application side:** Node is single-threaded, so a single process rarely needs many parallel connections. Long transactions or slow queries hold connections and empty the pool faster.
+- **Scaling beyond:** with many instances, a connection pooler such as PgBouncer sits in front of PostgreSQL and multiplexes many client connections onto few database connections.

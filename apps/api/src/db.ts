@@ -1,0 +1,12 @@
+import pg from 'pg';
+import { config } from './config.js';
+
+export const pool = new pg.Pool({
+  connectionString: config.DATABASE_URL,
+  max: config.DB_POOL_MAX,
+  connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+  console.error('pg pool error', err);
+});

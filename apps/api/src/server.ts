@@ -23,7 +23,8 @@ import {
   CreateCommentSchema,
 } from './models/comments.js';
 import { type Problem, ProblemSchema } from './models/problem.js';
-import { HttpError, NotFoundError } from './errors.js';
+import { HttpError, NotFoundError, ServiceUnavailableError } from './errors.js';
+import { pool } from './db.js';
 
 const { version } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -67,6 +68,10 @@ await app.register(swaggerUi, { routePrefix: '/api/docs' });
 // runs first for every request -> puts the request id into the x-request-id header.
 app.addHook('onRequest', async (req, reply) => {
   void reply.header('x-request-id', req.id);
+});
+
+app.addHook('onClose', async () => {
+  await pool.end();
 });
 
 app.setNotFoundHandler(async (req) => {
@@ -133,6 +138,27 @@ app.get(
   '/api/health',
   { schema: { tags: ['health'], response: { 200: HealthSchema } } },
   health
+);
+
+app.get(
+  '/health/ready',
+  {
+    schema: {
+      tags: ['health'],
+      response: {
+        200: z.object({ status: z.literal('ready') }),
+        503: ProblemSchema,
+      },
+    },
+  },
+  async () => {
+    try {
+      await pool.query('SELECT 1');
+    } catch {
+      throw new ServiceUnavailableError('Database not reachable');
+    }
+    return { status: 'ready' as const };
+  }
 );
 
 const requireBear = async (id: string): Promise<void> => {

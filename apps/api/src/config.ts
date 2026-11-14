@@ -15,6 +15,8 @@ const EnvSchema = z.object({
     'http://localhost:4173',
     'http://localhost:5173',
   ]),
+  DATABASE_URL: z.url(),
+  DB_POOL_MAX: z.coerce.number().int().positive().default(10),
 });
 
 // fails on startup if not valid

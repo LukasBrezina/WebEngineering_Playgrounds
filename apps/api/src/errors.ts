@@ -22,3 +22,8 @@ export class UpstreamTimeoutError extends HttpError {
     super(504, 'Gateway Timeout', 'Upstream did not respond in time');
   }
 }
+export class ServiceUnavailableError extends HttpError {
+  constructor(detail = 'Service unavailable') {
+    super(503, 'Service Unavailable', detail);
+  }
+}
