@@ -1033,6 +1033,34 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 
 ### Why does offset pagination get slower and skip or repeat rows, and how does a cursor avoid that? What is a B-tree index, why does the column order in a composite index matter, and why may PostgreSQL ignore an index on a small table?
 
+#### What a cursor is
+- A cursor is a **bookmark**: it marks where the last page ended, so the server knows where to continue.
+- It contains the **sort key of the last row** of a page, here `created_at` and `id` of the last comment. In this project it is sent to the client as an opaque string (base64url of `{ createdAt, id }`) in `nextCursor`.
+- The client does not read or build it, it only sends it back: `GET /api/bears/u-arctos/comments?cursor=<nextCursor>`. `nextCursor: null` means there is no further page.
+- Also called **keyset pagination**, because the next page is found by the key (the sort columns), not by counting rows.
+
+#### Cursor vs. limit/offset
+- Both are server-side pagination and both use `LIMIT` for the page size. The difference is **how the start of the next page is found**.
+- **Limit/offset:** "skip n rows, then return 20".
+  ```sql
+  SELECT * FROM comments WHERE bear_id = 'u-arctos'
+  ORDER BY created_at, id LIMIT 20 OFFSET 40;   -- page 3
+  ```
+- **Cursor:** "return 20 rows after this row".
+  ```sql
+  SELECT * FROM comments WHERE bear_id = 'u-arctos'
+    AND (created_at, id) > ('2026-11-17 06:53:55.803', '436d…')
+  ORDER BY created_at, id LIMIT 21;              -- 20 + 1 to know if there is more
+  ```
+
+| | Limit/offset | Cursor |
+|---|---|---|
+| Next page | skip n rows | everything after row X |
+| Speed | slower with every page (skipped rows are still read) | constant (jumps to row X via the index) |
+| New or deleted rows in between | rows are shown twice or skipped | stable |
+| Jump to "page 37" | possible | not possible, only next |
+| Fits | page numbers, small tables | "Load more", infinite scroll, large tables |
+
 #### Why offset pagination gets slower
 - `LIMIT 20 OFFSET 6000` means "skip 6,000 rows, then return 20". PostgreSQL cannot jump to row 6,000: it has to read the 6,000 rows (in sort order) and throw them away.
 - The deeper the page, the more rows are read and discarded. The cost grows with the page number, although every page returns only 20 rows.
