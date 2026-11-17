@@ -8,13 +8,23 @@ export interface Comment {
   createdAt: string;
 }
 
+export interface CommentPage {
+  items: Comment[];
+  nextCursor: string | null;
+}
+
 const bearCommentsUrl = (bearId: string): string =>
   `${API_BASE_URL}/api/bears/${encodeURIComponent(bearId)}/comments`;
 
-export const getComments = async (bearId: string): Promise<Comment[]> => {
-  const response = await fetch(bearCommentsUrl(bearId));
+export const getComments = async (
+  bearId: string,
+  cursor?: string
+): Promise<CommentPage> => {
+  const query =
+    cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`;
+  const response = await fetch(bearCommentsUrl(bearId) + query);
   await checkResponseOk(response);
-  return (await response.json()) as Comment[];
+  return (await response.json()) as CommentPage;
 };
 
 export const createComment = async (

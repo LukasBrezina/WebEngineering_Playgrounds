@@ -7,6 +7,11 @@ export class HttpError extends Error {
     super(detail);
   }
 }
+export class BadRequestError extends HttpError {
+  constructor(detail: string) {
+    super(400, 'Bad Request', detail);
+  }
+}
 export class NotFoundError extends HttpError {
   constructor(obj: string) {
     super(404, 'Not Found', `${obj} not found`);

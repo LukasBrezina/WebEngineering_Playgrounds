@@ -1,12 +1,13 @@
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '../db.js';
 import { bears, comments } from '../db/schema.js';
 import type { Comment } from '../models/comments.js';
-import type {
-  BearRepository,
-  CommentRepository,
-  HealthCheck,
+import {
+  type BearRepository,
+  type CommentRepository,
+  type HealthCheck,
+  toCommentPage,
 } from './types.js';
 
 const bearColumns = {
@@ -18,8 +19,12 @@ const bearColumns = {
 };
 
 export const createDrizzleBearRepository = (db: Database): BearRepository => ({
-  list: async () =>
-    await db.select(bearColumns).from(bears).orderBy(asc(bears.name)),
+  list: async ({ q } = {}) =>
+    await db
+      .select(bearColumns)
+      .from(bears)
+      .where(q === undefined ? undefined : ilike(bears.name, `%${q}%`))
+      .orderBy(asc(bears.name)),
 
   findById: async (id) => {
     const [bear] = await db
@@ -45,13 +50,21 @@ const isUuid = (id: string): boolean => z.uuid().safeParse(id).success;
 export const createDrizzleCommentRepository = (
   db: Database
 ): CommentRepository => ({
-  listByBear: async (bearId) => {
+  listByBear: async (bearId, { limit, after }) => {
     const rows = await db
       .select()
       .from(comments)
-      .where(eq(comments.bearId, bearId))
-      .orderBy(asc(comments.createdAt), asc(comments.id));
-    return rows.map(toComment);
+      .where(
+        and(
+          eq(comments.bearId, bearId),
+          after === undefined
+            ? undefined
+            : sql`(${comments.createdAt}, ${comments.id}) > (${after.createdAt}::timestamptz, ${after.id}::uuid)`
+        )
+      )
+      .orderBy(asc(comments.createdAt), asc(comments.id))
+      .limit(limit + 1);
+    return toCommentPage(rows.map(toComment), limit);
   },
 
   create: async (input) => {

@@ -20,8 +20,14 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { BearSchema } from './models/bear.js';
-import { CommentSchema, CreateCommentSchema } from './models/comments.js';
+import { BearSchema, BearsQuerySchema } from './models/bear.js';
+import {
+  CommentPageSchema,
+  CommentSchema,
+  CommentsQuerySchema,
+  CreateCommentSchema,
+} from './models/comments.js';
+import { decodeCursor, encodeCursor } from './models/cursor.js';
 import { type Problem, ProblemSchema } from './models/problem.js';
 import {
   HttpError,
@@ -187,10 +193,14 @@ export async function buildApp({
     {
       schema: {
         tags: ['bears'],
-        response: { 200: z.array(BearSchema) },
+        querystring: BearsQuerySchema,
+        response: { 200: z.array(BearSchema), 400: ProblemSchema },
       },
     },
-    async () => await app.repos.bears.list()
+    async ({ query }) =>
+      await app.repos.bears.list({
+        q: query.q === undefined || query.q === '' ? undefined : query.q,
+      })
   );
 
   app.get(
@@ -215,15 +225,26 @@ export async function buildApp({
       schema: {
         tags: ['comments'],
         params: BearParams,
+        querystring: CommentsQuerySchema,
         response: {
-          200: z.array(CommentSchema),
+          200: CommentPageSchema,
+          400: ProblemSchema,
           404: ProblemSchema,
         },
       },
     },
-    async ({ params }) => {
+    async ({ params, query }) => {
+      const after =
+        query.cursor === undefined ? undefined : decodeCursor(query.cursor);
       await requireBear(params.id);
-      return await app.repos.comments.listByBear(params.id);
+      const page = await app.repos.comments.listByBear(params.id, {
+        limit: query.limit,
+        after,
+      });
+      return {
+        items: page.items,
+        nextCursor: page.next === null ? null : encodeCursor(page.next),
+      };
     }
   );
 

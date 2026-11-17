@@ -17,6 +17,10 @@ export const BearsSchema = z
 
 export type Bear = z.infer<typeof BearSchema>;
 
+export const BearsQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+});
+
 export interface ParsedBear {
   name: string;
   binomial: string;

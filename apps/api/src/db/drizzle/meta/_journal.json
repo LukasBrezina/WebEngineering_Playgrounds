@@ -8,6 +8,13 @@
       "when": 1794677015601,
       "tag": "0000_tired_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794950235237,
+      "tag": "0001_woozy_gorilla_man",
+      "breakpoints": true
     }
   ]
 }

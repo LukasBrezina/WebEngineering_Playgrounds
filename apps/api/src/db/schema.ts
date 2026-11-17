@@ -20,9 +20,14 @@ export const comments = pgTable(
       .references(() => bears.id, { onDelete: 'cascade' }),
     author: text('author').notNull(),
     text: text('text').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
+    // precision 3 = milliseconds, same as JavaScript Date. With the default
+    // (microseconds) a cursor built from a JS date would not match the stored value.
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index('comments_bear_id_created_at_idx').on(t.bearId, t.createdAt)]
+  // keyset pagination: WHERE bear_id = ? AND (created_at, id) > (?, ?) ORDER BY created_at, id
+  (t) => [
+    index('comments_bear_id_created_at_id_idx').on(t.bearId, t.createdAt, t.id),
+  ]
 );

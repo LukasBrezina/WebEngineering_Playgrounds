@@ -68,7 +68,4 @@ VITE_API_BASE_URL=http://localhost:3000 npm run build -w apps/web && npm run pre
 
 ## Libraries beyond the lecture stack
 
-| Library | Why |
-|---|---|
-| `fastify-type-provider-zod` | Connects zod to Fastify: the same zod schemas validate requests, serialize responses, type the route handlers and are turned into the OpenAPI document. Without it, every schema would exist twice (zod plus hand-written JSON Schema) and could drift apart. |
-| `vitest` | Playground 5, Task 3 requires a test suite that runs against the in-memory repositories without a database. Vitest runs TypeScript and ESM directly (no build step, no extra Babel or ts-jest setup, unlike Jest), fits the Vite tooling already used by the web app, and has a Jest-compatible API (`describe`, `it`, `expect`). Together with Fastify's `app.inject()` the tests call the real routes without opening a port. |
+See [README.md](README.md#libraries-beyond-the-lecture-stack).

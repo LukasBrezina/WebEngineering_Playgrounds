@@ -11,6 +11,8 @@ import { errorMessage } from '../../api/api';
 export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
   const [areCommentsVisible, setAreCommentsVisible] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [name, setName] = useState('');
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
@@ -18,10 +20,13 @@ export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
   useEffect(() => {
     let stale = false;
     setComments([]);
+    setNextCursor(null);
     setError('');
     getComments(bearId)
-      .then((data) => {
-        if (!stale) setComments(data);
+      .then((page) => {
+        if (stale) return;
+        setComments(page.items);
+        setNextCursor(page.nextCursor);
       })
       .catch((e: unknown) => {
         if (!stale) setError(errorMessage(e, 'Could not load comments.'));
@@ -45,12 +50,29 @@ export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
         name.trim(),
         comment.trim()
       );
-      setComments((current) => [...current, newComment]);
+      if (nextCursor === null) {
+        setComments((current) => [...current, newComment]);
+      }
       setName('');
       setComment('');
       setError('');
     } catch (e) {
       setError(errorMessage(e, 'Could not submit comment.'));
+    }
+  };
+
+  const handleLoadMore = async (): Promise<void> => {
+    if (nextCursor === null) return;
+    setIsLoadingMore(true);
+    try {
+      const page = await getComments(bearId, nextCursor);
+      setComments((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+      setError('');
+    } catch (e) {
+      setError(errorMessage(e, 'Could not load more comments.'));
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -143,6 +165,18 @@ export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
                 </li>
               ))}
             </ul>
+
+            {nextCursor !== null && (
+              <button
+                type="button"
+                disabled={isLoadingMore}
+                onClick={() => {
+                  void handleLoadMore();
+                }}
+              >
+                {isLoadingMore ? 'Loading...' : 'Load more comments'}
+              </button>
+            )}
           </div>
         </div>
       </section>

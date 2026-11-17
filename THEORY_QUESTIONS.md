@@ -27,6 +27,7 @@
   - [Task 1](#task-1--add-postgresql-to-the-stack)
   - [Task 2](#task-2--model-bears-and-comments-and-write-the-first-migration)
   - [Task 3](#task-3--introduce-a-repository-layer)
+  - [Task 4](#task-4--pagination-filtering-and-one-measured-index)
 
 # Playground 1
 
@@ -1027,3 +1028,46 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
     ```
   - **Join or aggregation:** one query that returns bears with their comments (`LEFT JOIN comments ON comments.bear_id = bears.id`, or `json_agg` per bear).
 - **Rule:** the repository offers methods that match the use case ("comments for these bears"), not only "one entity at a time". The caller never loops over repository calls.
+
+## Task 4 – Pagination, filtering and one measured index
+
+### Why does offset pagination get slower and skip or repeat rows, and how does a cursor avoid that? What is a B-tree index, why does the column order in a composite index matter, and why may PostgreSQL ignore an index on a small table?
+
+#### Why offset pagination gets slower
+- `LIMIT 20 OFFSET 6000` means "skip 6,000 rows, then return 20". PostgreSQL cannot jump to row 6,000: it has to read the 6,000 rows (in sort order) and throw them away.
+- The deeper the page, the more rows are read and discarded. The cost grows with the page number, although every page returns only 20 rows.
+
+#### Why offset pagination skips or repeats rows
+- The offset counts **positions**, not rows. If the data changes between two requests, the positions shift.
+- **Repeat:** a new comment is inserted before the current position (e.g. sorted newest first). Everything moves down by one, and the last row of page 1 appears again as the first row of page 2.
+- **Skip:** a comment on an earlier page is deleted. Everything moves up by one, and one row is never shown.
+
+#### How a cursor avoids that
+- The cursor stores the **sort key of the last row** of the page (here `created_at` and `id`), not a position. The next page asks "everything after this row":
+  ```sql
+  WHERE bear_id = $1 AND (created_at, id) > ($cursorCreatedAt, $cursorId)
+  ORDER BY created_at, id LIMIT 21
+  ```
+- **Constant cost:** with the index, PostgreSQL jumps directly to the cursor position and reads only the next 21 rows, so a page deep in the list costs about the same as the first page.
+- **Stable:** inserts or deletes elsewhere do not move the position "after row X", so no row is shown twice or skipped.
+- `id` is the **tie-breaker**: many comments can have the same `created_at` (e.g. the seed). Only (`created_at`, `id`) is unique, so the order is complete and the cursor never lands "between" equal timestamps.
+- Trade-off: no jumping to "page 37", only next (and previous). That fits "Load more" in the UI.
+
+#### What a B-tree index is
+- A **balanced, sorted tree**: the leaf pages hold the indexed values in sorted order together with a pointer to the table row; the inner pages lead to the right leaf.
+- Every leaf is at the same depth, so finding a value takes about log(n) page reads (3–4 levels even for millions of rows).
+- The leaves are linked, so after finding the start PostgreSQL can **read a range in order** (`>`, `<`, `BETWEEN`, `ORDER BY`) without sorting.
+- In this project: the index (`bear_id`, `created_at`, `id`) finds the comments of one bear and returns them already sorted. The plan has no `Sort` node and reads 6 pages instead of 1,241.
+
+#### Why the column order in a composite index matters
+- A composite index is sorted by the first column, then by the second within equal first values, and so on, like a phone book (last name, first name).
+- It can only be used **from the left**: it helps for `bear_id`, for `bear_id` + `created_at`, and for `bear_id` + `created_at` + `id`, but not for `created_at` alone (just as a phone book does not help to find all people called "Anna").
+- Rule: **equality columns first, then the sort and range columns.** `bear_id` is compared with `=`, `created_at, id` are sorted and compared with `>`. With (`created_at`, `bear_id`), the comments of one bear would be spread over the whole index.
+- The index must match the `ORDER BY` exactly (`created_at, id`). That is why the old index (`bear_id`, `created_at`) from migration `0000` was replaced: without `id`, the tie-breaker of the cursor was not covered.
+
+#### Why PostgreSQL may ignore an index on a small table
+- The planner chooses the **cheapest plan** based on statistics (number of rows and pages, value distribution).
+- An index scan costs extra: reading index pages plus a random access to the table for every row found. A sequential scan reads the table pages one after another, which is cheap.
+- If the table fits into a few pages (e.g. the 8 rows of `bears`, or `comments` before the seed), reading everything is faster than using the index, so the planner chooses a `Seq Scan`.
+- The same happens when a condition matches a **large part** of the table: then the index would visit almost every page anyway.
+- Statistics must be current: after the seed the script runs `ANALYZE comments`. Without it the planner could still believe the table is tiny and choose a bad plan.

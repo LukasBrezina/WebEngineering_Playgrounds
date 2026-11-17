@@ -41,7 +41,58 @@ The project introduces a lot of code smells for you to tackle.
 ## Documentation
 
 * **Theory questions:** the answers to the theory questions of all playgrounds are in [THEORY_QUESTIONS.md](THEORY_QUESTIONS.md).
-* **Application startup:** how to start and configure the project (Docker, local development with `npm run dev`, database, commands, environment variables) and the **libraries beyond the lecture stack with the reasons for using them** are in [APPLICATION_STARTUP.md](APPLICATION_STARTUP.md).
+* **Application startup:** how to start and configure the project (Docker, local development with `npm run dev`, database, commands, environment variables) is in [APPLICATION_STARTUP.md](APPLICATION_STARTUP.md).
+* **Playground 5, Task 4 (index measurement):** summary below, all commands and details in [PG5_T4_INDEX_MEASUREMENT.md](PG5_T4_INDEX_MEASUREMENT.md).
+
+## Libraries beyond the lecture stack
+
+| Library | Why |
+|---|---|
+| `fastify-type-provider-zod` | Connects zod to Fastify: the same zod schemas validate requests, serialize responses, type the route handlers and are turned into the OpenAPI document. Without it, every schema would exist twice (zod plus hand-written JSON Schema) and could drift apart. |
+| `vitest` | Playground 5, Task 3 requires a test suite that runs against the in-memory repositories without a database. Vitest runs TypeScript and ESM directly (no build step, no extra Babel or ts-jest setup, unlike Jest), fits the Vite tooling already used by the web app, and has a Jest-compatible API (`describe`, `it`, `expect`). Together with Fastify's `app.inject()` the tests call the real routes without opening a port. |
+
+## Playground 5 – Task 4: Index measurement
+
+`EXPLAIN (ANALYZE, BUFFERS)` of the comments query `SELECT * FROM comments WHERE bear_id = 'u-arctos' ORDER BY created_at, id LIMIT 21`, run with `apps/api/sql/explain-comments.sql`, without and with the index on (`bear_id`, `created_at`, `id`) from migration `0001`. 100,000 comments (`npm run db:seed:comments -w apps/api`), 12,500 of them for `u-arctos`, PostgreSQL 18.7, median of three runs.
+
+| | Without index | With index |
+|---|---|---|
+| Plan | `Seq Scan` → `Sort` → `Limit` | `Index Scan` → `Limit`, no sort |
+| Rows read | 100,000 (87,500 removed by the filter) | 21 |
+| Buffers (8 kB pages) | 1,241 | 6 |
+| Execution time | **4.470 ms** | **0.028 ms** (about 160× faster) |
+
+Plan without index:
+
+```
+ Limit  (cost=2824.26..2824.31 rows=21 width=67) (actual time=4.454..4.456 rows=21.00 loops=1)
+   Buffers: shared hit=1241
+   ->  Sort  (cost=2824.26..2855.72 rows=12583 width=67) (actual time=4.453..4.454 rows=21.00 loops=1)
+         Sort Key: created_at, id
+         Sort Method: top-N heapsort  Memory: 30kB
+         Buffers: shared hit=1241
+         ->  Seq Scan on comments  (cost=0.00..2485.00 rows=12583 width=67) (actual time=0.002..3.350 rows=12500.00 loops=1)
+               Filter: (bear_id = 'u-arctos'::text)
+               Rows Removed by Filter: 87500
+               Buffers: shared hit=1235
+ Planning Time: 0.083 ms
+ Execution Time: 4.470 ms
+```
+
+Plan with index:
+
+```
+ Limit  (cost=0.42..9.64 rows=21 width=67) (actual time=0.016..0.020 rows=21.00 loops=1)
+   Buffers: shared hit=6
+   ->  Index Scan using comments_bear_id_created_at_id_idx on comments  (cost=0.42..5477.81 rows=12470 width=67) (actual time=0.015..0.019 rows=21.00 loops=1)
+         Index Cond: (bear_id = 'u-arctos'::text)
+         Index Searches: 1
+         Buffers: shared hit=6
+ Planning Time: 0.102 ms
+ Execution Time: 0.028 ms
+```
+
+Without the index PostgreSQL reads the whole table, filters by `bear_id` and sorts; with the index it jumps directly to `bear_id = 'u-arctos'` and reads the first 21 rows already in the right order. How to reproduce the measurement and the full interpretation: [PG5_T4_INDEX_MEASUREMENT.md](PG5_T4_INDEX_MEASUREMENT.md).
 
 
 # Coding Playground Description

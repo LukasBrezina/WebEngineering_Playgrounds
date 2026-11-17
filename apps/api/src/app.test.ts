@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type App, buildApp } from './app.js';
 import type { Bear } from './models/bear.js';
-import type { Comment } from './models/comments.js';
+import type { Comment, CommentPage } from './models/comments.js';
 import {
   createMemoryBearRepository,
   createMemoryCommentRepository,
@@ -96,13 +96,16 @@ describe('comments', () => {
       method: 'GET',
       url: '/api/bears/u-arctos/comments',
     });
-    expect(list.json<Comment[]>()).toEqual([comment]);
+    expect(list.json<CommentPage>()).toEqual({
+      items: [comment],
+      nextCursor: null,
+    });
 
     const other = await app.inject({
       method: 'GET',
       url: '/api/bears/u-maritimus/comments',
     });
-    expect(other.json<Comment[]>()).toEqual([]);
+    expect(other.json<CommentPage>()).toEqual({ items: [], nextCursor: null });
   });
 
   it('rejects an invalid body with 400', async () => {
