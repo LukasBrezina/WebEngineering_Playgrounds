@@ -51,3 +51,11 @@ export const CommentPageSchema = z
   .meta({ id: 'CommentPage' });
 
 export type CommentPage = z.infer<typeof CommentPageSchema>;
+
+export const ReportResultSchema = z
+  .object({
+    id: z.uuid(),
+    reportCount: z.int(),
+    hiddenAt: z.iso.datetime().nullable(),
+  })
+  .meta({ id: 'ReportResult' });

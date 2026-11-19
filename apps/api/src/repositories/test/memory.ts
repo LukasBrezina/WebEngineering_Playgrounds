@@ -6,6 +6,7 @@ import {
   type CommentKey,
   type CommentRepository,
   type HealthCheck,
+  type ReportState,
   toCommentPage,
 } from '../types.js';
 
@@ -32,10 +33,20 @@ const compareKey = (a: CommentKey, b: CommentKey): number =>
 
 export const createMemoryCommentRepository = (): CommentRepository => {
   const comments = new Map<string, Comment>();
-  return {
+  const reports = new Map<string, ReportState>();
+
+  const findReportState = async (
+    id: string
+  ): Promise<ReportState | undefined> => {
+    if (!comments.has(id)) return undefined;
+    return reports.get(id) ?? { id, reportCount: 0, hiddenAt: null };
+  };
+
+  const repository: CommentRepository = {
     listByBear: async (bearId, { limit, after }) => {
       const rows = [...comments.values()]
         .filter((c) => c.bearId === bearId)
+        .filter((c) => (reports.get(c.id)?.hiddenAt ?? null) === null)
         .filter((c) => after === undefined || compareKey(c, after) > 0)
         .sort(compareKey)
         .slice(0, limit + 1);
@@ -52,8 +63,21 @@ export const createMemoryCommentRepository = (): CommentRepository => {
       return comment;
     },
 
-    delete: async (id) => comments.delete(id),
+    delete: async (id) => {
+      reports.delete(id);
+      return comments.delete(id);
+    },
+
+    findReportState,
+    findReportStateForUpdate: findReportState,
+
+    saveReportState: async (state) => {
+      reports.set(state.id, state);
+    },
+
+    transaction: async (fn) => await fn(repository),
   };
+  return repository;
 };
 
 export const createMemoryHealthCheck = (): HealthCheck => ({

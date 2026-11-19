@@ -31,6 +31,12 @@ export interface CommentPageResult {
   next: CommentKey | null; // null = no further page
 }
 
+export interface ReportState {
+  id: string;
+  reportCount: number;
+  hiddenAt: Date | null;
+}
+
 export interface CommentRepository {
   listByBear: (
     bearId: string,
@@ -38,6 +44,15 @@ export interface CommentRepository {
   ) => Promise<CommentPageResult>;
   create: (input: NewComment) => Promise<Comment>;
   delete: (id: string) => Promise<boolean>;
+  findReportState: (id: string) => Promise<ReportState | undefined>;
+  // SELECT ... FOR UPDATE: locks the row until the surrounding transaction ends
+  findReportStateForUpdate: (id: string) => Promise<ReportState | undefined>;
+  saveReportState: (state: ReportState) => Promise<void>;
+  // runs fn in one transaction (COMMIT on success, ROLLBACK on error);
+  // the caller (service) decides where the transaction starts and ends
+  transaction: <T>(
+    fn: (comments: CommentRepository) => Promise<T>
+  ) => Promise<T>;
 }
 
 export interface HealthCheck {

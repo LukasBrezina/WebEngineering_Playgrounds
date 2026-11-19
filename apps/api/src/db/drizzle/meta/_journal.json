@@ -15,6 +15,13 @@
       "when": 1794950235237,
       "tag": "0001_woozy_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795043202707,
+      "tag": "0002_conscious_captain_cross",
+      "breakpoints": true
     }
   ]
 }

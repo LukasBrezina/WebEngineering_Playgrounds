@@ -26,6 +26,7 @@ import {
   CommentSchema,
   CommentsQuerySchema,
   CreateCommentSchema,
+  ReportResultSchema,
 } from './models/comments.js';
 import { decodeCursor, encodeCursor } from './models/cursor.js';
 import { type Problem, ProblemSchema } from './models/problem.js';
@@ -35,6 +36,7 @@ import {
   ServiceUnavailableError,
 } from './errors/errors.js';
 import type { Repositories } from './repositories/types.js';
+import { createCommentService } from './services/comments.js';
 
 // app.repos is available in every handler
 declare module 'fastify' {
@@ -289,6 +291,29 @@ export async function buildApp({
       if (!(await app.repos.comments.delete(params.commentId)))
         throw new NotFoundError('Comment');
       return await reply.code(204).send();
+    }
+  );
+
+  const commentService = createCommentService(app.repos.comments);
+
+  app.post(
+    '/api/comments/:commentId/report',
+    {
+      schema: {
+        tags: ['comments'],
+        params: z.object({ commentId: z.string() }),
+        response: { 200: ReportResultSchema, 404: ProblemSchema },
+      },
+    },
+    async ({ params }) => {
+      const state = await commentService.report(params.commentId);
+      // use this for the naive version
+      // const state = await commentService.reportNaive(params.commentId);
+      return {
+        id: state.id,
+        reportCount: state.reportCount,
+        hiddenAt: state.hiddenAt === null ? null : state.hiddenAt.toISOString(),
+      };
     }
   );
 

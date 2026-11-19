@@ -28,6 +28,7 @@
   - [Task 2](#task-2--model-bears-and-comments-and-write-the-first-migration)
   - [Task 3](#task-3--introduce-a-repository-layer)
   - [Task 4](#task-4--pagination-filtering-and-one-measured-index)
+  - [Task 5](#task-5--transactions-and-the-lost-update)
 
 # Playground 1
 
@@ -1099,3 +1100,60 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 - If the table fits into a few pages (e.g. the 8 rows of `bears`, or `comments` before the seed), reading everything is faster than using the index, so the planner chooses a `Seq Scan`.
 - The same happens when a condition matches a **large part** of the table: then the index would visit almost every page anyway.
 - Statistics must be current: after the seed the script runs `ANALYZE comments`. Without it the planner could still believe the table is tiny and choose a bad plan.
+
+## Task 5 – Transactions and the lost update
+
+### Explain ACID and the lost-update anomaly. What does PostgreSQL's default isolation level (read committed) guarantee, and what not? Compare pessimistic locking, atomic updates and optimistic concurrency with a version column.
+
+#### ACID
+- **Atomicity:** a transaction happens completely or not at all. If anything fails, `ROLLBACK` undoes all its changes.
+- **Consistency:** a transaction takes the database from one valid state to another; constraints (`NOT NULL`, foreign keys, `UNIQUE`) are never violated.
+- **Isolation:** concurrent transactions do not see each other's unfinished work. How strictly they are separated depends on the isolation level.
+- **Durability:** after `COMMIT` the change survives a crash (it is in the write-ahead log on disk).
+
+#### Lost update
+- Two transactions read the same value, both change it in the application and both write it back. The second write overwrites the first, so the first change is **lost**.
+- Example from this project (`reportNaive`): request A reads `report_count = 0`, request B also reads `0`, both compute `1` and both write `1`. Two reports, but the counter is `1`.
+- Measured with the script `comments-transaction-test.ts`: 50 concurrent reports ended with `report_count` 2–10 instead of 50 (see `PG5_T5_LOST_UPDATE.md`).
+- It happens with the **read-modify-write** pattern: read in one statement, compute in the application, write in another statement.
+
+#### Read committed (PostgreSQL default)
+- **Guarantees:**
+  - No dirty reads: a statement only sees data that was already committed, never unfinished changes of other transactions.
+  - Each statement sees a snapshot as of the start of that statement.
+  - A single `UPDATE` waits for a row lock held by another transaction and then works on the newest committed version of the row. So `SET report_count = report_count + 1` in one statement is safe.
+- **Does not guarantee:**
+  - **Lost updates** are possible with read-modify-write across two statements: the `SELECT` sees the old committed value, nothing stops a second transaction from reading the same value.
+  - **Non-repeatable reads:** the same `SELECT` twice in one transaction can return different values, because each statement takes a new snapshot.
+  - **Phantoms:** a repeated query can return new rows that another transaction inserted in the meantime.
+- Stronger levels (`REPEATABLE READ`, `SERIALIZABLE`) detect such conflicts and abort one transaction with a serialization error, which the application then has to retry.
+
+#### Pessimistic locking (`SELECT ... FOR UPDATE`) – used in this project
+- The row is locked when it is read. Other transactions that want to lock or change the same row **wait** until the first one commits or rolls back.
+- In `report`: the service opens a transaction, reads with `FOR UPDATE`, increments, writes, commits. Result: exactly 50.
+- Pro: simple, works for any logic in the application (here also the "hidden at three reports" rule).
+- Contra: requests wait for each other (lower throughput on one hot row), locks are held for the whole transaction, and locking several rows in different order can cause deadlocks.
+
+#### Atomic update
+- The database does the change in **one statement**: `UPDATE comments SET report_count = report_count + 1 WHERE id = $1 RETURNING report_count`.
+- No separate read, so there is nothing to lose. The row lock is held only for this one statement.
+- Pro: fastest and simplest for counters and similar "relative" changes.
+- Contra: only works if the logic can be expressed in SQL. Conditions like "set `hidden_at` at the third report" have to move into the statement (`CASE WHEN report_count + 1 >= 3 ...`).
+
+#### Optimistic concurrency (version column)
+- Each row has a `version` column. Read the row and its version, compute, then write only if the version is unchanged:
+  ```sql
+  UPDATE comments SET report_count = $new, version = version + 1
+  WHERE id = $1 AND version = $readVersion;
+  ```
+- If another transaction was faster, the `WHERE` matches **0 rows**: the application detects the conflict and retries (read again) or reports an error (e.g. `409 Conflict`).
+- Pro: no locks and no waiting; good when conflicts are rare and the "transaction" spans a longer time (e.g. a user edits a form for minutes).
+- Contra: on a hot row like 50 concurrent reports almost every attempt conflicts and has to be retried, which is slower than locking.
+
+#### Comparison
+| | Pessimistic (`FOR UPDATE`) | Atomic update | Optimistic (version) |
+|---|---|---|---|
+| Idea | lock, then change | change in one statement | change, detect conflict |
+| On conflict | wait | wait (very short) | 0 rows → retry or error |
+| Best for | read-modify-write logic in the app | counters, simple relative changes | rare conflicts, long edits |
+| Risk | waiting, deadlocks | logic must fit into SQL | many retries on hot rows |

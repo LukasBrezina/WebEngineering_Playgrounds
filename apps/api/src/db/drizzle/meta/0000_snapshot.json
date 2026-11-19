@@ -53,9 +53,7 @@
         "bears_binomial_unique": {
           "name": "bears_binomial_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "binomial"
-          ]
+          "columns": ["binomial"]
         }
       },
       "policies": {},
@@ -127,12 +125,8 @@
           "name": "comments_bear_id_bears_id_fk",
           "tableFrom": "comments",
           "tableTo": "bears",
-          "columnsFrom": [
-            "bear_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bear_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

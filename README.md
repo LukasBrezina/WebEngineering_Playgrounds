@@ -41,8 +41,9 @@ The project introduces a lot of code smells for you to tackle.
 ## Documentation
 
 * **Theory questions:** the answers to the theory questions of all playgrounds are in [THEORY_QUESTIONS.md](THEORY_QUESTIONS.md).
-* **Application startup:** how to start and configure the project (Docker, local development with `npm run dev`, database, commands, environment variables) is in [APPLICATION_STARTUP.md](APPLICATION_STARTUP.md).
-* **Playground 5, Task 4 (index measurement):** summary below, all commands and details in [PG5_T4_INDEX_MEASUREMENT.md](PG5_T4_INDEX_MEASUREMENT.md).
+* **Application startup:** how to start and configure the project (Docker, local development with `npm run dev`, database, commands, environment variables) is in [APPLICATION_STARTUP.md](docs/APPLICATION_STARTUP.md).
+* **Playground 5, Task 4 (index measurement):** summary below, all commands and details in [PG5_T4_INDEX_MEASUREMENT.md](docs/PG5_T4_INDEX_MEASUREMENT.md).
+* **Playground 5, Task 5 (lost update):** the script `comments-transaction-test.ts`, the results of the naive and the fixed version and the explanation are in [PG5_T5_LOST_UPDATE.md](docs/PG5_T5_LOST_UPDATE.md).
 
 ## Libraries beyond the lecture stack
 
@@ -92,7 +93,7 @@ Plan with index:
  Execution Time: 0.028 ms
 ```
 
-Without the index PostgreSQL reads the whole table, filters by `bear_id` and sorts; with the index it jumps directly to `bear_id = 'u-arctos'` and reads the first 21 rows already in the right order. How to reproduce the measurement and the full interpretation: [PG5_T4_INDEX_MEASUREMENT.md](PG5_T4_INDEX_MEASUREMENT.md).
+Without the index PostgreSQL reads the whole table, filters by `bear_id` and sorts; with the index it jumps directly to `bear_id = 'u-arctos'` and reads the first 21 rows already in the right order. How to reproduce the measurement and the full interpretation: [PG5_T4_INDEX_MEASUREMENT.md](docs/PG5_T4_INDEX_MEASUREMENT.md).
 
 
 # Coding Playground Description

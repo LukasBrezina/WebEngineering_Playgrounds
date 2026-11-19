@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '../db.js';
 import { bears, comments } from '../db/schema.js';
@@ -7,8 +7,12 @@ import {
   type BearRepository,
   type CommentRepository,
   type HealthCheck,
+  type ReportState,
   toCommentPage,
 } from './types.js';
+
+type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+type Executor = Database | Transaction;
 
 const bearColumns = {
   id: bears.id,
@@ -47,8 +51,14 @@ const toComment = (row: typeof comments.$inferSelect): Comment => ({
 
 const isUuid = (id: string): boolean => z.uuid().safeParse(id).success;
 
+const reportColumns = {
+  id: comments.id,
+  reportCount: comments.reportCount,
+  hiddenAt: comments.hiddenAt,
+};
+
 export const createDrizzleCommentRepository = (
-  db: Database
+  db: Executor
 ): CommentRepository => ({
   listByBear: async (bearId, { limit, after }) => {
     const rows = await db
@@ -57,6 +67,7 @@ export const createDrizzleCommentRepository = (
       .where(
         and(
           eq(comments.bearId, bearId),
+          isNull(comments.hiddenAt),
           after === undefined
             ? undefined
             : sql`(${comments.createdAt}, ${comments.id}) > (${after.createdAt}::timestamptz, ${after.id}::uuid)`
@@ -80,6 +91,37 @@ export const createDrizzleCommentRepository = (
       .returning({ id: comments.id });
     return deleted.length > 0;
   },
+
+  findReportState: async (id): Promise<ReportState | undefined> => {
+    if (!isUuid(id)) return undefined;
+    const [row] = await db
+      .select(reportColumns)
+      .from(comments)
+      .where(eq(comments.id, id));
+    return row;
+  },
+
+  findReportStateForUpdate: async (id): Promise<ReportState | undefined> => {
+    if (!isUuid(id)) return undefined;
+    const [row] = await db
+      .select(reportColumns)
+      .from(comments)
+      .where(eq(comments.id, id))
+      .for('update');
+    return row;
+  },
+
+  saveReportState: async ({ id, reportCount, hiddenAt }) => {
+    await db
+      .update(comments)
+      .set({ reportCount, hiddenAt })
+      .where(eq(comments.id, id));
+  },
+
+  transaction: async (fn) =>
+    await db.transaction(
+      async (tx) => await fn(createDrizzleCommentRepository(tx))
+    ),
 });
 
 export const createDrizzleHealthCheck = (db: Database): HealthCheck => ({

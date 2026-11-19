@@ -1,4 +1,11 @@
-import { pgTable, text, timestamp, uuid, index } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  index,
+  integer,
+} from 'drizzle-orm/pg-core';
 
 export const bears = pgTable('bears', {
   id: text('id').primaryKey(), // binomial slug
@@ -25,8 +32,9 @@ export const comments = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true, precision: 3 })
       .notNull()
       .defaultNow(),
+    reportCount: integer('report_count').notNull().default(0),
+    hiddenAt: timestamp('hidden_at', { withTimezone: true, precision: 3 }),
   },
-  // keyset pagination: WHERE bear_id = ? AND (created_at, id) > (?, ?) ORDER BY created_at, id
   (t) => [
     index('comments_bear_id_created_at_id_idx').on(t.bearId, t.createdAt, t.id),
   ]
