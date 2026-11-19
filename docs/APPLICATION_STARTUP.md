@@ -12,14 +12,14 @@ Starts three containers: `db` (PostgreSQL 18, named volume `pgdata`, healthcheck
 
 ## Local development (`npm run dev`)
 
-The database is a separate service and must be running before `npm run dev`. The API reads `DATABASE_URL` from `../.env` in the repository root (not committed, created from `.env.example`).
+The database is a separate service and must be running before `npm run dev`. The API reads `DATABASE_URL` from `.env` in the repository root (not committed, created from `.env.example`).
 
 ```bash
 npm install
 cp .env.example .env                      # DATABASE_URL=postgres://web:web@localhost:5432/web
 docker compose up -d db                   # only the database, port 5432
-npm run db:migrate -w apps/api            # create the tables (once, and after every new migration)
-npm run db:seed -w apps/api               # fetch the bears from Wikipedia and upsert them
+npm run db:migrate                        # create the tables (once, and after every new migration)
+npm run db:seed                           # fetch the bears from Wikipedia and upsert them
 npm run dev                               # API (tsx watch, port 3000) + web app (Vite, port 5173)
 ```
 
@@ -29,10 +29,12 @@ Vite proxies `/api` to the API, so the browser only talks to `http://localhost:5
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | API + web app with hot reload (needs a running database and `../.env`) |
-| `npm run db:generate -w apps/api` | Generates a new SQL migration from `../apps/api/src/db/schema.ts` (drizzle-kit) |
-| `npm run db:migrate -w apps/api` | Applies all pending migrations (`../apps/api/src/db/drizzle`) |
-| `npm run db:seed -w apps/api` | Fetches the bears through the BFF code (`../apps/api/src/source`) and upserts them into `bears` |
+| `npm run dev` | API + web app with hot reload (needs a running database and `.env`) |
+| `npm run db:generate -w apps/api` | Generates a new SQL migration from `apps/api/src/db/schema.ts` (drizzle-kit) |
+| `npm run db:migrate` | Applies all pending migrations (`apps/api/src/db/drizzle`) |
+| `npm run db:seed` | Fetches the bears through the BFF code (`apps/api/src/source`) and upserts them into `bears` |
+| `npm run db:seed:comments -w apps/api` | Inserts 100,000 comments for the index measurement (Playground 5, Task 4, see [PG5_T4_INDEX_MEASUREMENT.md](PG5_T4_INDEX_MEASUREMENT.md)) |
+| `npm run comments:transaction-test -w apps/api` | Sends 50 concurrent reports for one comment and prints the final `report_count` (Playground 5, Task 5, see [PG5_T5_LOST_UPDATE.md](PG5_T5_LOST_UPDATE.md)); needs the running API |
 | `npm test -w apps/api` | Runs the API test suite (Vitest) against the in-memory repositories, no database needed |
 | `npm run lint` / `format:check` / `typecheck` / `build` | Quality checks for both workspaces (also run in CI) |
 
@@ -42,17 +44,17 @@ Health: `/health` is the liveness check (process only), `/health/ready` the read
 
 ## Environment variables
 
-No real secrets are needed; the database credentials are local development defaults. All variables are validated with zod at startup (`../apps/api/src/config.ts`), so a missing or wrong value stops the API immediately instead of failing on the first request.
+No real secrets are needed; the database credentials are local development defaults. All variables are validated with zod at startup (`apps/api/src/config.ts`), so a missing or wrong value stops the API immediately instead of failing on the first request.
 
 | Variable | Workspace | Default | Purpose |
 |---|---|---|---|
-| `DATABASE_URL` | api | **none (required)** | PostgreSQL connection string. Local: from `../.env` (see `.env.example`); Docker: set in `compose.yaml` (`db` as host) |
+| `DATABASE_URL` | api | **none (required)** | PostgreSQL connection string. Local: from `.env` (see `.env.example`); Docker: set in `compose.yaml` (`db` as host) |
 | `DB_POOL_MAX` | api | `10` | Maximum number of connections in the `pg` pool |
 | `PORT` | api | `3000` | Port the API listens on |
 | `HOST` | api | `0.0.0.0` | Interface the API binds to |
 | `WIKIPEDIA_API_URL` | api (seed) | `https://en.wikipedia.org/w/api.php` | Upstream URL used by `db:seed`; the API itself reads bears from the database |
-| `CORS_ORIGINS` | api | `http://localhost:4173,http://localhost:5173` | Comma-separated CORS allow-list (`../compose.yaml` adds `http://localhost:8080`) |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | compose | `web` / `web` / `web` | Credentials of the `db` container; `../compose.yaml` builds the API's `DATABASE_URL` from them |
+| `CORS_ORIGINS` | api | `http://localhost:4173,http://localhost:5173` | Comma-separated CORS allow-list (`compose.yaml` adds `http://localhost:8080`) |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | compose | `web` / `web` / `web` | Credentials of the `db` container; `compose.yaml` builds the API's `DATABASE_URL` from them |
 | `VITE_API_BASE_URL` | web (build time) | empty | Empty: same-origin requests to `/api`. Absolute URL (e.g. `http://localhost:3000`): cross-origin requests, used for the CORS demo with `vite preview` |
 
 Examples:
