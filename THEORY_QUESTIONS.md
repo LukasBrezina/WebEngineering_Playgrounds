@@ -29,6 +29,8 @@
   - [Task 3](#task-3--introduce-a-repository-layer)
   - [Task 4](#task-4--pagination-filtering-and-one-measured-index)
   - [Task 5](#task-5--transactions-and-the-lost-update)
+- [Playground 6](#playground-6)
+  - [Task 1](#task-1--users-and-password-storage)
 
 # Playground 1
 
@@ -1157,3 +1159,40 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 | On conflict | wait | wait (very short) | 0 rows → retry or error |
 | Best for | read-modify-write logic in the app | counters, simple relative changes | rare conflicts, long edits |
 | Risk | waiting, deadlocks | logic must fit into SQL | many retries on hot rows |
+
+# Playground 6
+
+## Task 1 – Users and password storage
+
+### Why hash instead of encrypt, what do salt and work factor do, and why is a deliberately slow hash a feature? Why do current guidelines (NIST SP 800-63B) prefer length over composition rules? What is the trade-off between a clear 409 and user enumeration?
+
+#### Hash instead of encrypt
+- Encryption is reversible: whoever gets the key gets all passwords back. The key usually lives on the same server, so it leaks together with the database.
+- Hashing is one-way: on login the entered password is hashed again (same salt and parameters) and compared.
+- A leaked table only contains hashes, so an attacker has to guess every password.
+- In this project: `POST /api/auth/register` hashes with argon2id and stores only `password_hash`; the API response never contains it.
+
+#### Salt and work factor
+- **Salt:** random value per password, stored with the hash.
+  - Same password → different hash, so rainbow tables don't work and each hash must be cracked separately.
+  - It is not secret; it only has to be unique.
+- **Work factor:** how expensive one hash is (argon2id: `m` = memory, `t` = iterations, `p` = parallelism).
+  - Stored in the hash, so it can be raised later as hardware gets faster.
+- Example from the DB: `$argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>` (64 MiB, 3 iterations, 4 lanes)
+
+#### Why slow is a feature
+- The server hashes once per login (a few ms, the user doesn't notice), the attacker once per guess.
+- Fast hashes (MD5, SHA-256) allow billions of guesses per second on a GPU.
+- argon2id is slow and memory-hard: each guess needs time and lots of memory, which GPUs don't have per core, so brute force becomes very expensive.
+- Downside: hashing costs server resources, so register/login need rate limiting (Task 4).
+
+#### Length over composition rules (NIST SP 800-63B)
+- Length increases the search space the most; every extra character multiplies it.
+- Composition rules lead to predictable patterns (`Password1!`) and passwords people can't remember, so they write them down or reuse them.
+- NIST recommends: minimum length (here 12), allow long passphrases, no composition rules, no forced periodic changes, check against lists of breached passwords.
+
+#### 409 vs. user enumeration
+- A clear 409 tells the user they already have an account and should log in → good UX.
+- But it also tells an attacker which emails are registered: a privacy leak and a list of targets for credential stuffing and phishing.
+- Alternative: always the same answer ("check your email") and inform the owner by email → more privacy, but worse UX and email sending is needed.
+- For a bear website the clear 409 is acceptable; for sensitive services (health, dating) uniform answers are better.

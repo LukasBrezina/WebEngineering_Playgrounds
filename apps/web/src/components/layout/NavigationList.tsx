@@ -1,4 +1,5 @@
 import { Search } from '../features/Search.js';
+import { AccountMenu } from './AccountMenu.js';
 import React from 'react';
 
 export function NavigationList(): React.JSX.Element {
@@ -20,6 +21,8 @@ export function NavigationList(): React.JSX.Element {
       </ul>
 
       <Search />
+
+      <AccountMenu />
     </nav>
   );
 }

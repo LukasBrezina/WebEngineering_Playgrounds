@@ -137,6 +137,44 @@ nav .search {
   color: white;
 }
 
+nav .account-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 2em;
+}
+
+.account-menu button {
+  font-size: 1.6rem;
+  height: 32px;
+  background: #333;
+  border: 0;
+  color: white;
+  cursor: pointer;
+}
+
+.account-menu ul {
+  position: absolute;
+  top: 100%;
+  right: 2em;
+  z-index: 10;
+  flex-direction: column;
+  min-width: 100%;
+  margin: 0;
+  background-color: white;
+  border: 1px solid #333;
+}
+
+.account-menu li {
+  display: block;
+  text-align: left;
+  padding: 0.5rem 1rem;
+}
+
+.account-menu a {
+  font-size: 1.6rem;
+}
+
 /* || main layout */
 
 main {

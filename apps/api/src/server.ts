@@ -5,12 +5,14 @@ import {
   createDrizzleBearRepository,
   createDrizzleCommentRepository,
   createDrizzleHealthCheck,
+  createDrizzleUserRepository,
 } from './repositories/drizzle.js';
 
 const app = await buildApp({
   repos: {
     bears: createDrizzleBearRepository(db),
     comments: createDrizzleCommentRepository(db),
+    users: createDrizzleUserRepository(db),
     health: createDrizzleHealthCheck(db),
   },
   corsOrigins: config.CORS_ORIGINS,

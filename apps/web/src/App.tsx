@@ -12,6 +12,7 @@ import { Route, Routes } from 'react-router-dom';
 import { BearDetail } from './components/features/BearDetail.js';
 import { BackButton } from './components/features/BackButton.js';
 import { Highlight } from './components/features/Highlight.js';
+import { Register } from './components/features/Register.js';
 
 export function App(): React.JSX.Element {
   const [state, setState] = useState<State>({ status: 'loading' });
@@ -51,6 +52,7 @@ export function App(): React.JSX.Element {
         <Routes>
           <Route path="/" element={<Article state={state} />} />
           <Route path="/bears/:bearId" element={<BearDetail />} />
+          <Route path="/register" element={<Register />} />
           <Route
             path="*"
             element={

@@ -17,6 +17,11 @@ export class NotFoundError extends HttpError {
     super(404, 'Not Found', `${obj} not found`);
   }
 }
+export class ConflictError extends HttpError {
+  constructor(detail: string) {
+    super(409, 'Conflict', detail);
+  }
+}
 export class UpstreamError extends HttpError {
   constructor(detail = 'Upstream request failed') {
     super(502, 'Bad Gateway', detail);

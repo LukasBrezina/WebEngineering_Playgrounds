@@ -28,9 +28,12 @@ import {
   CreateCommentSchema,
   ReportResultSchema,
 } from './models/comments.js';
+import argon2 from 'argon2';
 import { decodeCursor, encodeCursor } from './models/cursor.js';
 import { type Problem, ProblemSchema } from './models/problem.js';
+import { RegisterSchema, UserSchema } from './models/users.js';
 import {
+  ConflictError,
   HttpError,
   NotFoundError,
   ServiceUnavailableError,
@@ -314,6 +317,30 @@ export async function buildApp({
         reportCount: state.reportCount,
         hiddenAt: state.hiddenAt === null ? null : state.hiddenAt.toISOString(),
       };
+    }
+  );
+
+  app.post(
+    '/api/auth/register',
+    {
+      schema: {
+        tags: ['auth'],
+        body: RegisterSchema,
+        response: { 201: UserSchema, 400: ProblemSchema, 409: ProblemSchema },
+      },
+    },
+    async ({ body }, reply) => {
+      // only store hashed password
+      const passwordHash = await argon2.hash(body.password, {
+        type: argon2.argon2id,
+      });
+      const user = await app.repos.users.create({
+        email: body.email,
+        passwordHash,
+      });
+      if (user === undefined)
+        throw new ConflictError('Email is already registered');
+      return await reply.code(201).send(user);
     }
   );
 

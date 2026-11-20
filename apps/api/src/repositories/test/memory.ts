@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { Bear } from '../../models/bear.js';
 import type { Comment } from '../../models/comments.js';
+import type { User } from '../../models/users.js';
 import {
   type BearRepository,
   type CommentKey,
   type CommentRepository,
   type HealthCheck,
   type ReportState,
+  type UserRepository,
   toCommentPage,
 } from '../types.js';
 
@@ -78,6 +80,23 @@ export const createMemoryCommentRepository = (): CommentRepository => {
     transaction: async (fn) => await fn(repository),
   };
   return repository;
+};
+
+export const createMemoryUserRepository = (): UserRepository => {
+  const users = new Map<string, User>(); // key: email
+  return {
+    create: async ({ email }) => {
+      if (users.has(email)) return undefined;
+      const user: User = {
+        id: randomUUID(),
+        email,
+        role: 'user',
+        createdAt: new Date().toISOString(),
+      };
+      users.set(email, user);
+      return user;
+    },
+  };
 };
 
 export const createMemoryHealthCheck = (): HealthCheck => ({

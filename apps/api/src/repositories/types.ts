@@ -1,5 +1,6 @@
 import type { Bear } from '../models/bear.js';
 import type { Comment } from '../models/comments.js';
+import type { User } from '../models/users.js';
 
 export interface BearFilter {
   q?: string;
@@ -55,6 +56,16 @@ export interface CommentRepository {
   ) => Promise<T>;
 }
 
+export interface NewUser {
+  email: string;
+  passwordHash: string;
+}
+
+export interface UserRepository {
+  // undefined means email already in use (unique constraint)
+  create: (input: NewUser) => Promise<User | undefined>;
+}
+
 export interface HealthCheck {
   ping: () => Promise<void>;
 }
@@ -62,6 +73,7 @@ export interface HealthCheck {
 export interface Repositories {
   bears: BearRepository;
   comments: CommentRepository;
+  users: UserRepository;
   health: HealthCheck;
 }
 

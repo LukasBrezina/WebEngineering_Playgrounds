@@ -1,13 +1,15 @@
 import { and, asc, eq, ilike, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '../db.js';
-import { bears, comments } from '../db/schema.js';
+import { bears, comments, users } from '../db/schema.js';
 import type { Comment } from '../models/comments.js';
+import type { User } from '../models/users.js';
 import {
   type BearRepository,
   type CommentRepository,
   type HealthCheck,
   type ReportState,
+  type UserRepository,
   toCommentPage,
 } from './types.js';
 
@@ -122,6 +124,35 @@ export const createDrizzleCommentRepository = (
     await db.transaction(
       async (tx) => await fn(createDrizzleCommentRepository(tx))
     ),
+});
+
+// PostgreSQL unique_violation; drizzle wraps the pg error in `cause`
+const isUniqueViolation = (e: unknown): boolean => {
+  const code = (err: unknown): unknown =>
+    typeof err === 'object' && err !== null && 'code' in err
+      ? err.code
+      : undefined;
+  const cause = e instanceof Error ? e.cause : undefined;
+  return code(e) === '23505' || code(cause) === '23505';
+};
+
+const toUser = (row: typeof users.$inferSelect): User => ({
+  id: row.id,
+  email: row.email,
+  role: row.role,
+  createdAt: row.createdAt.toISOString(),
+});
+
+export const createDrizzleUserRepository = (db: Database): UserRepository => ({
+  create: async (input) => {
+    try {
+      const [row] = await db.insert(users).values(input).returning();
+      return toUser(row);
+    } catch (e) {
+      if (isUniqueViolation(e)) return undefined;
+      throw e;
+    }
+  },
 });
 
 export const createDrizzleHealthCheck = (db: Database): HealthCheck => ({
