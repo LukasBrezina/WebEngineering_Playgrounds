@@ -7,8 +7,9 @@ import Fastify, {
   type RawServerDefault,
 } from 'fastify';
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { STATUS_CODES } from 'node:http';
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -31,12 +32,13 @@ import {
 import argon2 from 'argon2';
 import { decodeCursor, encodeCursor } from './models/cursor.js';
 import { type Problem, ProblemSchema } from './models/problem.js';
-import { RegisterSchema, UserSchema } from './models/users.js';
+import { LoginSchema, RegisterSchema, UserSchema } from './models/users.js';
 import {
   ConflictError,
   HttpError,
   NotFoundError,
   ServiceUnavailableError,
+  UnauthorizedError,
 } from './errors/errors.js';
 import type { Repositories } from './repositories/types.js';
 import { createCommentService } from './services/comments.js';
@@ -52,8 +54,13 @@ export interface AppOptions {
   // injected implementation
   repos: Repositories;
   corsOrigins: string[];
+  // Secure flag on the session cookie (production only, dev runs on http)
+  secureCookies?: boolean;
   logger?: boolean;
 }
+
+const SESSION_COOKIE = 'sid';
+const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 const { version } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -65,6 +72,7 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 export async function buildApp({
   repos,
   corsOrigins,
+  secureCookies = false,
   logger = true,
 }: AppOptions): Promise<App> {
   const app = createFastify(logger);
@@ -84,6 +92,9 @@ export async function buildApp({
     exposedHeaders: ['x-request-id', 'location'],
     maxAge: 600,
   });
+
+  // parses the Cookie header into req.cookies, adds reply.setCookie / clearCookie
+  await app.register(cookie);
 
   await app.register(swagger, {
     openapi: { openapi: '3.1.0', info: { title: 'Bears API', version } },
@@ -341,6 +352,79 @@ export async function buildApp({
       if (user === undefined)
         throw new ConflictError('Email is already registered');
       return await reply.code(201).send(user);
+    }
+  );
+
+  const cookieOptions = {
+    httpOnly: true, // not readable from JavaScript (XSS)
+    secure: secureCookies, // HTTPS only in production
+    sameSite: 'lax' as const, // not sent on cross-site POSTs (CSRF)
+    path: '/api', // only sent to the API
+  };
+
+  app.post(
+    '/api/auth/login',
+    {
+      schema: {
+        tags: ['auth'],
+        body: LoginSchema,
+        response: { 200: UserSchema, 400: ProblemSchema, 401: ProblemSchema },
+      },
+    },
+    async ({ body }, reply) => {
+      const credentials = await app.repos.users.findCredentialsByEmail(
+        body.email
+      );
+      if (
+        credentials === undefined ||
+        !(await argon2.verify(credentials.passwordHash, body.password))
+      )
+        throw new UnauthorizedError('Invalid email or password');
+
+      const sessionId = randomBytes(32).toString('base64url');
+      await app.repos.sessions.create({
+        id: sessionId,
+        userId: credentials.user.id,
+        expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000),
+      });
+      return await reply
+        .setCookie(SESSION_COOKIE, sessionId, {
+          ...cookieOptions,
+          maxAge: SESSION_TTL_SECONDS,
+        })
+        .send(credentials.user);
+    }
+  );
+
+  app.post(
+    '/api/auth/logout',
+    { schema: { tags: ['auth'], response: { 204: z.undefined() } } },
+    async (req, reply) => {
+      const sessionId = req.cookies[SESSION_COOKIE];
+      if (sessionId !== undefined) await app.repos.sessions.delete(sessionId);
+      return await reply
+        .clearCookie(SESSION_COOKIE, cookieOptions)
+        .code(204)
+        .send();
+    }
+  );
+
+  app.get(
+    '/api/auth/me',
+    {
+      schema: {
+        tags: ['auth'],
+        response: { 200: UserSchema, 401: ProblemSchema },
+      },
+    },
+    async (req) => {
+      const sessionId = req.cookies[SESSION_COOKIE];
+      const user =
+        sessionId === undefined
+          ? undefined
+          : await app.repos.sessions.findUser(sessionId);
+      if (user === undefined) throw new UnauthorizedError();
+      return user;
     }
   );
 

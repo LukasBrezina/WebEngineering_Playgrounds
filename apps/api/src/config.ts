@@ -8,6 +8,10 @@ const commaList = z.string().transform((value) =>
 );
 
 const EnvSchema = z.object({
+  // production -> session cookie gets the Secure flag
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
   WIKIPEDIA_API_URL: z.url().default('https://en.wikipedia.org/w/api.php'),

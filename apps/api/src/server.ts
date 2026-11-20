@@ -5,6 +5,7 @@ import {
   createDrizzleBearRepository,
   createDrizzleCommentRepository,
   createDrizzleHealthCheck,
+  createDrizzleSessionRepository,
   createDrizzleUserRepository,
 } from './repositories/drizzle.js';
 
@@ -13,9 +14,11 @@ const app = await buildApp({
     bears: createDrizzleBearRepository(db),
     comments: createDrizzleCommentRepository(db),
     users: createDrizzleUserRepository(db),
+    sessions: createDrizzleSessionRepository(db),
     health: createDrizzleHealthCheck(db),
   },
   corsOrigins: config.CORS_ORIGINS,
+  secureCookies: config.NODE_ENV === 'production',
 });
 
 app.addHook('onClose', async () => {

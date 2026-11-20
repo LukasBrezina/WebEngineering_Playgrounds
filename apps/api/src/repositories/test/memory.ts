@@ -7,7 +7,9 @@ import {
   type CommentKey,
   type CommentRepository,
   type HealthCheck,
+  type NewSession,
   type ReportState,
+  type SessionRepository,
   type UserRepository,
   toCommentPage,
 } from '../types.js';
@@ -82,19 +84,42 @@ export const createMemoryCommentRepository = (): CommentRepository => {
   return repository;
 };
 
-export const createMemoryUserRepository = (): UserRepository => {
-  const users = new Map<string, User>(); // key: email
+export const createMemoryAuthRepositories = (): {
+  users: UserRepository;
+  sessions: SessionRepository;
+} => {
+  const users = new Map<string, { user: User; passwordHash: string }>(); // key: email
+  const sessions = new Map<string, NewSession>();
+
   return {
-    create: async ({ email }) => {
-      if (users.has(email)) return undefined;
-      const user: User = {
-        id: randomUUID(),
-        email,
-        role: 'user',
-        createdAt: new Date().toISOString(),
-      };
-      users.set(email, user);
-      return user;
+    users: {
+      create: async ({ email, passwordHash }) => {
+        if (users.has(email)) return undefined;
+        const user: User = {
+          id: randomUUID(),
+          email,
+          role: 'user',
+          createdAt: new Date().toISOString(),
+        };
+        users.set(email, { user, passwordHash });
+        return user;
+      },
+      findCredentialsByEmail: async (email) => users.get(email),
+    },
+    sessions: {
+      create: async (input) => {
+        sessions.set(input.id, input);
+      },
+      findUser: async (sessionId) => {
+        const session = sessions.get(sessionId);
+        if (session === undefined || session.expiresAt <= new Date())
+          return undefined;
+        return [...users.values()].find((u) => u.user.id === session.userId)
+          ?.user;
+      },
+      delete: async (sessionId) => {
+        sessions.delete(sessionId);
+      },
     },
   };
 };

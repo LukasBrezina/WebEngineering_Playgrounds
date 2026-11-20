@@ -64,6 +64,23 @@ export interface NewUser {
 export interface UserRepository {
   // undefined means email already in use (unique constraint)
   create: (input: NewUser) => Promise<User | undefined>;
+  // user plus stored hash, only for the login check
+  findCredentialsByEmail: (
+    email: string
+  ) => Promise<{ user: User; passwordHash: string } | undefined>;
+}
+
+export interface NewSession {
+  id: string;
+  userId: string;
+  expiresAt: Date;
+}
+
+export interface SessionRepository {
+  create: (input: NewSession) => Promise<void>;
+  // undefined = unknown or expired session
+  findUser: (sessionId: string) => Promise<User | undefined>;
+  delete: (sessionId: string) => Promise<void>;
 }
 
 export interface HealthCheck {
@@ -74,6 +91,7 @@ export interface Repositories {
   bears: BearRepository;
   comments: CommentRepository;
   users: UserRepository;
+  sessions: SessionRepository;
   health: HealthCheck;
 }
 

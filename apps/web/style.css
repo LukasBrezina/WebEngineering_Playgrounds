@@ -62,9 +62,13 @@ h3 {
   font-size: 2.2rem;
 }
 
-p, li, table {
+p, li, table, dt, dd {
   font-size: 1.6rem;
   line-height: 1.5;
+}
+
+dt {
+  font-weight: bold;
 }
 
 /* || header layout */
@@ -169,6 +173,15 @@ nav .account-menu {
   display: block;
   text-align: left;
   padding: 0.5rem 1rem;
+}
+
+.account-menu li button {
+  font-size: 1.6rem;
+  height: auto;
+  padding: 0;
+  background: none;
+  color: black;
+  text-transform: uppercase;
 }
 
 .account-menu a {

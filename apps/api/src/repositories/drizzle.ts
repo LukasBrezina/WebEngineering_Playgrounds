@@ -1,7 +1,7 @@
-import { and, asc, eq, ilike, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, ilike, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '../db.js';
-import { bears, comments, users } from '../db/schema.js';
+import { bears, comments, sessions, users } from '../db/schema.js';
 import type { Comment } from '../models/comments.js';
 import type { User } from '../models/users.js';
 import {
@@ -9,6 +9,7 @@ import {
   type CommentRepository,
   type HealthCheck,
   type ReportState,
+  type SessionRepository,
   type UserRepository,
   toCommentPage,
 } from './types.js';
@@ -152,6 +153,41 @@ export const createDrizzleUserRepository = (db: Database): UserRepository => ({
       if (isUniqueViolation(e)) return undefined;
       throw e;
     }
+  },
+
+  findCredentialsByEmail: async (email) => {
+    const [row] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    return row === undefined
+      ? undefined
+      : { user: toUser(row), passwordHash: row.passwordHash };
+  },
+});
+
+export const createDrizzleSessionRepository = (
+  db: Database
+): SessionRepository => ({
+  create: async (input) => {
+    await db.insert(sessions).values(input);
+  },
+
+  findUser: async (sessionId) => {
+    const [row] = await db
+      .select({ user: users })
+      .from(sessions)
+      .innerJoin(users, eq(users.id, sessions.userId))
+      .where(
+        and(eq(sessions.id, sessionId), gt(sessions.expiresAt, sql`now()`))
+      )
+      .limit(1);
+    return row === undefined ? undefined : toUser(row.user);
+  },
+
+  delete: async (sessionId) => {
+    await db.delete(sessions).where(eq(sessions.id, sessionId));
   },
 });
 

@@ -1,8 +1,15 @@
 import { Search } from '../features/Search.js';
 import { AccountMenu } from './AccountMenu.js';
+import { type User } from '../../api/auth';
 import React from 'react';
 
-export function NavigationList(): React.JSX.Element {
+export function NavigationList({
+  user,
+  onLogout,
+}: {
+  user: User | null;
+  onLogout: () => Promise<void>;
+}): React.JSX.Element {
   return (
     <nav>
       <ul>
@@ -22,7 +29,7 @@ export function NavigationList(): React.JSX.Element {
 
       <Search />
 
-      <AccountMenu />
+      <AccountMenu user={user} onLogout={onLogout} />
     </nav>
   );
 }

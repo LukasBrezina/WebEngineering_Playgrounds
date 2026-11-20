@@ -17,6 +17,11 @@ export class NotFoundError extends HttpError {
     super(404, 'Not Found', `${obj} not found`);
   }
 }
+export class UnauthorizedError extends HttpError {
+  constructor(detail = 'Not logged in') {
+    super(401, 'Unauthorized', detail);
+  }
+}
 export class ConflictError extends HttpError {
   constructor(detail: string) {
     super(409, 'Conflict', detail);

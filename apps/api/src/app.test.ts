@@ -6,7 +6,7 @@ import {
   createMemoryBearRepository,
   createMemoryCommentRepository,
   createMemoryHealthCheck,
-  createMemoryUserRepository,
+  createMemoryAuthRepositories,
 } from './repositories/test/memory.js';
 
 const BEARS: Bear[] = [
@@ -33,7 +33,7 @@ beforeEach(async () => {
     repos: {
       bears: createMemoryBearRepository(BEARS),
       comments: createMemoryCommentRepository(),
-      users: createMemoryUserRepository(),
+      ...createMemoryAuthRepositories(),
       health: createMemoryHealthCheck(),
     },
     corsOrigins: [],

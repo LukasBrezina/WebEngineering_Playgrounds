@@ -28,6 +28,21 @@ export const users = pgTable('users', {
     .defaultNow(),
 });
 
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: text('id').primaryKey(), // send to browser in session cookie
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('sessions_user_id_idx').on(t.userId)]
+);
+
 export const comments = pgTable(
   'comments',
   {

@@ -31,6 +31,7 @@
   - [Task 5](#task-5--transactions-and-the-lost-update)
 - [Playground 6](#playground-6)
   - [Task 1](#task-1--users-and-password-storage)
+  - [Task 2](#task-2--login-and-session-with-a-written-decision)
 
 # Playground 1
 
@@ -1196,3 +1197,36 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 - But it also tells an attacker which emails are registered: a privacy leak and a list of targets for credential stuffing and phishing.
 - Alternative: always the same answer ("check your email") and inform the owner by email → more privacy, but worse UX and email sending is needed.
 - For a bear website the clear 409 is acceptable; for sensitive services (health, dating) uniform answers are better.
+
+## Task 2 – Login and session, with a written decision
+
+### Compare session cookies and JWTs regarding revocation, statelessness, size and storage in the browser. What does an XSS attacker get in each case, and how does `SameSite` relate to CSRF?
+
+#### Session cookie vs. JWT
+| | Session cookie (this project) | JWT |
+|---|---|---|
+| Revocation | delete the row → invalid immediately | valid until `exp`; needs a denylist or short lifetime + refresh token |
+| Statelessness | stateful: server looks up the session on every request | stateless: signature check only, no DB lookup |
+| Size | small (random id, here 43 characters) | larger (header, claims, signature), sent with every request |
+| Storage in browser | `HttpOnly` cookie, not readable by JS | often `localStorage` (readable by JS) or also an `HttpOnly` cookie |
+
+- **Revocation** is the main difference: in this project logout runs `DELETE FROM sessions`, so a copied session id is worthless at once. A stolen JWT keeps working until it expires.
+- **Statelessness** helps when many servers must verify tokens without shared storage. With one API and PostgreSQL already in the stack, it brings little.
+- A JWT that is revoked through a denylist is stateful again, so the main advantage is gone.
+
+#### What an XSS attacker gets
+- XSS = the attacker's JavaScript runs in the user's page.
+- **JWT in `localStorage`:** the script reads the token and sends it to the attacker, who can use it from anywhere until it expires.
+- **`HttpOnly` session cookie:** the script cannot read it (`document.cookie` is empty). It can only send requests from the open page, and the browser adds the cookie.
+  - The attacker can act as the user only while the page is open and cannot take the session away.
+  - After logout the session is gone on the server.
+- Neither protects fully against XSS: the real defence is preventing XSS (React escaping, Content Security Policy).
+
+#### `SameSite` and CSRF
+- **CSRF** (Cross-Site Request Forgery): a foreign site makes the browser send a request to our API, and the browser automatically adds our cookie, so the request runs as the user.
+- This only affects credentials the browser sends automatically, i.e. cookies. A JWT in an `Authorization` header is not added by the browser, so it is not vulnerable to CSRF.
+- `SameSite` controls whether a cookie is sent on cross-site requests:
+  - `Strict`: never cross-site, even when following a link to the site.
+  - `Lax` (this project): only for top-level navigations with safe methods (`GET` link click); not for cross-site `POST`, `DELETE`, `fetch` or forms. So a foreign form cannot post as the user.
+  - `None`: always sent (requires `Secure`); CSRF protection must then come from elsewhere (CSRF tokens).
+- `Lax` relies on `GET` being safe: a `GET` that changes data would still be open to CSRF.
