@@ -7,8 +7,15 @@ import {
   createComment,
 } from '../../api/comments';
 import { errorMessage } from '../../api/api';
+import { type User } from '../../api/auth';
 
-export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
+export function Comments({
+  bearId,
+  user,
+}: {
+  bearId: string;
+  user: User | null;
+}): React.JSX.Element {
   const [areCommentsVisible, setAreCommentsVisible] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -75,6 +82,10 @@ export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
       setIsLoadingMore(false);
     }
   };
+
+  // reflects server rule, only author and moderator can delete
+  const canDelete = (c: Comment): boolean =>
+    user !== null && (user.role === 'moderator' || c.authorId === user.id);
 
   const handleDelete = async (commentId: string): Promise<void> => {
     try {
@@ -154,14 +165,16 @@ export function Comments({ bearId }: { bearId: string }): React.JSX.Element {
                 <li key={c.id}>
                   <p>{c.author}</p>
                   <p>{c.text}</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleDelete(c.id);
-                    }}
-                  >
-                    Delete
-                  </button>
+                  {canDelete(c) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleDelete(c.id);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

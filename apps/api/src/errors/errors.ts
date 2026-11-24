@@ -22,6 +22,11 @@ export class UnauthorizedError extends HttpError {
     super(401, 'Unauthorized', detail);
   }
 }
+export class ForbiddenError extends HttpError {
+  constructor(detail = 'Not allowed') {
+    super(403, 'Forbidden', detail);
+  }
+}
 export class ConflictError extends HttpError {
   constructor(detail: string) {
     super(409, 'Conflict', detail);

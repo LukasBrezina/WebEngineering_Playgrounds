@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const ROLE_USER = 'user';
+export const ROLE_MODERATOR = 'moderator';
+
 const PASSWORD_MIN = 12;
 const PASSWORD_MAX = 256;
 

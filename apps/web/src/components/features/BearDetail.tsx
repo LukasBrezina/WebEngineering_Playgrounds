@@ -6,6 +6,7 @@ import { fetchBear } from '../../api/bears.js';
 import { ApiError, errorMessage } from '../../api/api.js';
 import { BackButton } from './BackButton.js';
 import { Comments } from './Comments.js';
+import { type User } from '../../api/auth.js';
 
 type DetailState =
   | { status: 'loading' }
@@ -13,7 +14,7 @@ type DetailState =
   | { status: 'notFound'; message: string }
   | { status: 'success'; bear: Bear };
 
-export function BearDetail(): React.JSX.Element {
+export function BearDetail({ user }: { user: User | null }): React.JSX.Element {
   const { bearId } = useParams();
   const [state, setState] = useState<DetailState>({ status: 'loading' });
 
@@ -84,7 +85,7 @@ export function BearDetail(): React.JSX.Element {
           </p>
           <p>Range: {bear.range}</p>
         </Highlight>
-        <Comments bearId={bear.id} />
+        <Comments bearId={bear.id} user={user} />
       </>
     );
   }

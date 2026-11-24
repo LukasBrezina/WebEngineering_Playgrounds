@@ -76,7 +76,7 @@ export function App(): React.JSX.Element {
       <main>
         <Routes>
           <Route path="/" element={<Article state={state} />} />
-          <Route path="/bears/:bearId" element={<BearDetail />} />
+          <Route path="/bears/:bearId" element={<BearDetail user={user} />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login onLogin={setUser} />} />
           <Route path="/me" element={<Me user={user} />} />

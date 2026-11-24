@@ -1230,3 +1230,32 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
   - `Lax` (this project): only for top-level navigations with safe methods (`GET` link click); not for cross-site `POST`, `DELETE`, `fetch` or forms. So a foreign form cannot post as the user.
   - `None`: always sent (requires `Secure`); CSRF protection must then come from elsewhere (CSRF tokens).
 - `Lax` relies on `GET` being safe: a `GET` that changes data would still be open to CSRF.
+
+## Task 3 – Authorisation for comments
+
+### Authentication versus authorisation, 401 versus 403. Explain RBAC and ownership checks, what an IDOR vulnerability is (OWASP A01 Broken Access Control) and why hiding a button in the client is not a security control.
+
+#### Authentication vs. authorisation, 401 vs. 403
+- **Authentication:** *who are you?* Login with email and password, afterwards the session cookie. Here `requireUser` in `app.ts`.
+- **Authorisation:** *what may you do?* A decision for a known user, one action and one resource. Here `assertCanDeleteComment` in `policies/comments.ts`.
+
+| | 401 Unauthorized | 403 Forbidden |
+|---|---|---|
+| Meaning | not authenticated (no or invalid session) | authenticated, but not allowed |
+| Client should | log in and try again | stop; logging in again does not help |
+| Here | `POST` or `DELETE` a comment without a login | `DELETE` on another user's comment |
+
+#### RBAC and ownership checks
+- **RBAC (role-based access control):** permissions belong to roles. Here `users.role` is `user` or `moderator`; a moderator may delete every comment.
+- **Ownership check:** permission depends on the relation to the resource, here `comment.author_id = user.id`. A role alone cannot express "only your own".
+- The rule combines both: `role === moderator || authorId === user.id`.
+
+#### IDOR (OWASP A01)
+- **IDOR (Insecure Direct Object Reference):** the API uses an object id from the request directly to access the object, without checking whether the caller may access *that* object. Changing the id in the URL is enough to read or change other users' data.
+- Example here: `DELETE /api/comments/:id`. Before this task, anyone could delete any comment by sending its id.
+- Fix: load the comment, compare its stored `author_id` with the session user, only then delete. The owner comes from the database and the session, never from the request.
+- Hard-to-guess UUIDs are not access control.
+
+#### Why hiding a button is not a security control
+- The client is under the user's control: curl or DevTools send the request without the UI.
+- Only the server check protects. Hiding the button is UX: it hides actions that would fail with 403.

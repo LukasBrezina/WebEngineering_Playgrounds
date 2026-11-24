@@ -22,6 +22,8 @@ services:
       WIKIPEDIA_API_URL: ${WIKIPEDIA_API_URL:-https://en.wikipedia.org/w/api.php}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:4173,http://localhost:5173}
       DATABASE_URL: postgres://${POSTGRES_USER:-web}:${POSTGRES_PASSWORD:-web}@db:5432/${POSTGRES_DB:-web}
+      MODERATOR_EMAIL: ${MODERATOR_EMAIL:-moderator@bears.test}
+      MODERATOR_PASSWORD: ${MODERATOR_PASSWORD:-}
     # migrate + seed before the server starts (server only starts if both succeed)
     command:
       [

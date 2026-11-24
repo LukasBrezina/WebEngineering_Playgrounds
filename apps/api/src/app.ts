@@ -2,6 +2,7 @@ import Fastify, {
   type FastifyBaseLogger,
   type FastifyError,
   type FastifyInstance,
+  type FastifyRequest,
   type RawReplyDefaultExpression,
   type RawRequestDefaultExpression,
   type RawServerDefault,
@@ -32,7 +33,13 @@ import {
 import argon2 from 'argon2';
 import { decodeCursor, encodeCursor } from './models/cursor.js';
 import { type Problem, ProblemSchema } from './models/problem.js';
-import { LoginSchema, RegisterSchema, UserSchema } from './models/users.js';
+import {
+  LoginSchema,
+  RegisterSchema,
+  type User,
+  UserSchema,
+} from './models/users.js';
+import { assertCanDeleteComment } from './policies/comments.js';
 import {
   ConflictError,
   HttpError,
@@ -95,6 +102,17 @@ export async function buildApp({
 
   // parses the Cookie header into req.cookies, adds reply.setCookie / clearCookie
   await app.register(cookie);
+
+  // 401 Problem without a valid session cookie
+  const requireUser = async (req: FastifyRequest): Promise<User> => {
+    const sessionId = req.cookies[SESSION_COOKIE];
+    const user =
+      sessionId === undefined
+        ? undefined
+        : await app.repos.sessions.findUser(sessionId);
+    if (user === undefined) throw new UnauthorizedError();
+    return user;
+  };
 
   await app.register(swagger, {
     openapi: { openapi: '3.1.0', info: { title: 'Bears API', version } },
@@ -274,16 +292,19 @@ export async function buildApp({
         response: {
           201: CommentSchema,
           400: ProblemSchema,
+          401: ProblemSchema,
           404: ProblemSchema,
         },
       },
     },
-    async ({ params, body }, reply) => {
-      await requireBear(params.id);
+    async (req, reply) => {
+      const user = await requireUser(req);
+      await requireBear(req.params.id);
       const comment = await app.repos.comments.create({
-        bearId: params.id,
-        author: body.author,
-        text: body.text,
+        bearId: req.params.id,
+        author: req.body.author,
+        authorId: user.id,
+        text: req.body.text,
       });
       return await reply
         .code(201)
@@ -298,11 +319,20 @@ export async function buildApp({
       schema: {
         tags: ['comments'],
         params: z.object({ commentId: z.string() }),
-        response: { 204: z.undefined(), 404: ProblemSchema },
+        response: {
+          204: z.undefined(),
+          401: ProblemSchema,
+          403: ProblemSchema,
+          404: ProblemSchema,
+        },
       },
     },
-    async ({ params }, reply) => {
-      if (!(await app.repos.comments.delete(params.commentId)))
+    async (req, reply) => {
+      const user = await requireUser(req);
+      const comment = await app.repos.comments.findById(req.params.commentId);
+      if (comment === undefined) throw new NotFoundError('Comment');
+      assertCanDeleteComment(user, comment);
+      if (!(await app.repos.comments.delete(comment.id)))
         throw new NotFoundError('Comment');
       return await reply.code(204).send();
     }

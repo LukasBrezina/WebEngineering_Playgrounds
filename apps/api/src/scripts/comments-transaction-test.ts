@@ -12,9 +12,27 @@ try {
   const bearId = bears[0]?.id;
   if (bearId === undefined) throw new Error('No bears – run npm run db:seed');
 
+  // creating a comment needs a login (Playground 6, Task 3): throwaway user
+  const credentials = JSON.stringify({
+    email: `race-${Date.now()}@bears.test`,
+    password: 'race-test-password',
+  });
+  const json = { 'content-type': 'application/json' };
+  await fetch(`${API}/auth/register`, {
+    method: 'POST',
+    headers: json,
+    body: credentials,
+  });
+  const login = await fetch(`${API}/auth/login`, {
+    method: 'POST',
+    headers: json,
+    body: credentials,
+  });
+  const cookie = (login.headers.get('set-cookie') ?? '').split(';')[0];
+
   const created = await fetch(`${API}/bears/${bearId}/comments`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { ...json, cookie },
     body: JSON.stringify({ author: 'Race test', text: 'Report me 50 times' }),
   });
   const { id } = (await created.json()) as { id: string };

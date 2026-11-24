@@ -23,6 +23,7 @@ export const CommentSchema = z
     id: z.uuid(),
     bearId: z.string(),
     author: z.string(),
+    authorId: z.uuid().nullable(),
     text: z.string(),
     createdAt: z.iso.datetime(),
   })

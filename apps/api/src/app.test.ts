@@ -41,6 +41,26 @@ beforeEach(async () => {
   });
 });
 
+// creating and deleting comments needs a login
+let cookie: string;
+beforeEach(async () => {
+  const credentials = {
+    email: 'bob@bears.test',
+    password: 'long enough password',
+  };
+  await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: credentials,
+  });
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    payload: credentials,
+  });
+  cookie = `sid=${res.cookies[0].value}`;
+});
+
 afterEach(async () => {
   await app.close();
 });
@@ -53,6 +73,7 @@ const postComment = async (
     method: 'POST',
     url: `/api/bears/${bearId}/comments`,
     payload: body as Record<string, unknown>,
+    headers: { cookie },
   });
 
 describe('bears', () => {
@@ -128,12 +149,14 @@ describe('comments', () => {
     const first = await app.inject({
       method: 'DELETE',
       url: `/api/comments/${id}`,
+      headers: { cookie },
     });
     expect(first.statusCode).toBe(204);
 
     const second = await app.inject({
       method: 'DELETE',
       url: `/api/comments/${id}`,
+      headers: { cookie },
     });
     expect(second.statusCode).toBe(404);
   });

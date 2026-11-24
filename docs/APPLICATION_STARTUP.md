@@ -32,7 +32,7 @@ Vite proxies `/api` to the API, so the browser only talks to `http://localhost:5
 | `npm run dev` | API + web app with hot reload (needs a running database and `.env`) |
 | `npm run db:generate -w apps/api` | Generates a new SQL migration from `apps/api/src/db/schema.ts` (drizzle-kit) |
 | `npm run db:migrate` | Applies all pending migrations (`apps/api/src/db/drizzle`) |
-| `npm run db:seed` | Fetches the bears through the BFF code (`apps/api/src/source`) and upserts them into `bears` |
+| `npm run db:seed` | Creates the moderator (if `MODERATOR_PASSWORD` is set), then fetches the bears through the BFF code (`apps/api/src/source`) and upserts them into `bears` |
 | `npm run db:seed:comments -w apps/api` | Inserts 100,000 comments for the index measurement (Playground 5, Task 4, see [PG5_T4_INDEX_MEASUREMENT.md](PG5_T4_INDEX_MEASUREMENT.md)) |
 | `npm run comments:transaction-test -w apps/api` | Sends 50 concurrent reports for one comment and prints the final `report_count` (Playground 5, Task 5, see [PG5_T5_LOST_UPDATE.md](PG5_T5_LOST_UPDATE.md)); needs the running API |
 | `npm test -w apps/api` | Runs the API test suite (Vitest) against the in-memory repositories, no database needed |
@@ -54,6 +54,8 @@ No real secrets are needed; the database credentials are local development defau
 | `HOST` | api | `0.0.0.0` | Interface the API binds to |
 | `WIKIPEDIA_API_URL` | api (seed) | `https://en.wikipedia.org/w/api.php` | Upstream URL used by `db:seed`; the API itself reads bears from the database |
 | `CORS_ORIGINS` | api | `http://localhost:4173,http://localhost:5173` | Comma-separated CORS allow-list (`compose.yaml` adds `http://localhost:8080`) |
+| `MODERATOR_EMAIL` | api (seed) | `moderator@bears.test` | Account that `db:seed` creates with the role `moderator` (Playground 6, Task 3) |
+| `MODERATOR_PASSWORD` | api (seed) | none, moderator seed is skipped | Password of the moderator; only in `.env`, never in git |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | compose | `web` / `web` / `web` | Credentials of the `db` container; `compose.yaml` builds the API's `DATABASE_URL` from them |
 | `VITE_API_BASE_URL` | web (build time) | empty | Empty: same-origin requests to `/api`. Absolute URL (e.g. `http://localhost:3000`): cross-origin requests, used for the CORS demo with `vite preview` |
 

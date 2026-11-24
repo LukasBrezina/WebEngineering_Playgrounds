@@ -14,6 +14,7 @@ export interface BearRepository {
 export interface NewComment {
   bearId: string;
   author: string;
+  authorId: string;
   text: string;
 }
 
@@ -44,6 +45,7 @@ export interface CommentRepository {
     page: CommentPageRequest
   ) => Promise<CommentPageResult>;
   create: (input: NewComment) => Promise<Comment>;
+  findById: (id: string) => Promise<Comment | undefined>;
   delete: (id: string) => Promise<boolean>;
   findReportState: (id: string) => Promise<ReportState | undefined>;
   // SELECT ... FOR UPDATE: locks the row until the surrounding transaction ends

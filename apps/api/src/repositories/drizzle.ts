@@ -48,6 +48,7 @@ const toComment = (row: typeof comments.$inferSelect): Comment => ({
   id: row.id,
   bearId: row.bearId,
   author: row.author,
+  authorId: row.authorId,
   text: row.text,
   createdAt: row.createdAt.toISOString(),
 });
@@ -84,6 +85,16 @@ export const createDrizzleCommentRepository = (
   create: async (input) => {
     const [row] = await db.insert(comments).values(input).returning();
     return toComment(row);
+  },
+
+  findById: async (id) => {
+    if (!isUuid(id)) return undefined;
+    const [row] = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.id, id))
+      .limit(1);
+    return row === undefined ? undefined : toComment(row);
   },
 
   delete: async (id) => {

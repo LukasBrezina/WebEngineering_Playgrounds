@@ -4,6 +4,7 @@ export interface Comment {
   id: string;
   bearId: string;
   author: string;
+  authorId: string | null;
   text: string;
   createdAt: string;
 }

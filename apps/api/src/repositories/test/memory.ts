@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Bear } from '../../models/bear.js';
 import type { Comment } from '../../models/comments.js';
-import type { User } from '../../models/users.js';
+import { ROLE_USER, type User } from '../../models/users.js';
 import {
   type BearRepository,
   type CommentKey,
@@ -67,6 +67,8 @@ export const createMemoryCommentRepository = (): CommentRepository => {
       return comment;
     },
 
+    findById: async (id) => comments.get(id),
+
     delete: async (id) => {
       reports.delete(id);
       return comments.delete(id);
@@ -98,7 +100,7 @@ export const createMemoryAuthRepositories = (): {
         const user: User = {
           id: randomUUID(),
           email,
-          role: 'user',
+          role: ROLE_USER,
           createdAt: new Date().toISOString(),
         };
         users.set(email, { user, passwordHash });

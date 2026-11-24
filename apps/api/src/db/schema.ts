@@ -51,6 +51,9 @@ export const comments = pgTable(
       .notNull()
       .references(() => bears.id, { onDelete: 'cascade' }),
     author: text('author').notNull(),
+    authorId: uuid('author_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
     text: text('text').notNull(),
     // precision 3 = milliseconds, same as JavaScript Date. With the default
     // (microseconds) a cursor built from a JS date would not match the stored value.
