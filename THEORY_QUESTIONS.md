@@ -32,6 +32,7 @@
 - [Playground 6](#playground-6)
   - [Task 1](#task-1--users-and-password-storage)
   - [Task 2](#task-2--login-and-session-with-a-written-decision)
+  - [Task 3](#task-3--authorisation-for-comments)
 
 # Playground 1
 
@@ -1185,7 +1186,7 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 - The server hashes once per login (a few ms, the user doesn't notice), the attacker once per guess.
 - Fast hashes (MD5, SHA-256) allow billions of guesses per second on a GPU.
 - argon2id is slow and memory-hard: each guess needs time and lots of memory, which GPUs don't have per core, so brute force becomes very expensive.
-- Downside: hashing costs server resources, so register/login need rate limiting (Task 4).
+- Downside: hashing costs server resources, so register/login need rate limiting.
 
 #### Length over composition rules (NIST SP 800-63B)
 - Length increases the search space the most; every extra character multiplies it.
