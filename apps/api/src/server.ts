@@ -19,6 +19,7 @@ const app = await buildApp({
   },
   corsOrigins: config.CORS_ORIGINS,
   secureCookies: config.NODE_ENV === 'production',
+  trustProxy: config.TRUST_PROXY,
 });
 
 app.addHook('onClose', async () => {

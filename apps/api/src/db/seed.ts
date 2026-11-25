@@ -1,14 +1,15 @@
 import argon2 from 'argon2';
 import { sql } from 'drizzle-orm';
 import { fetchBearsFromWikipedia } from '../source/bears.js';
+import { config } from '../config.js';
 import { db, pool } from '../db.js';
 import { ROLE_MODERATOR } from '../models/users.js';
 import { bears, users } from './schema.js';
 
 // one moderator; the password only comes from the environment (no secrets in git)
 const seedModerator = async (): Promise<void> => {
-  const email = process.env.MODERATOR_EMAIL ?? 'moderator@bears.test';
-  const password = process.env.MODERATOR_PASSWORD;
+  const email = config.MODERATOR_EMAIL;
+  const password = config.MODERATOR_PASSWORD;
   if (password === undefined || password === '') {
     console.warn('MODERATOR_PASSWORD not set – skipping the moderator seed');
     return;

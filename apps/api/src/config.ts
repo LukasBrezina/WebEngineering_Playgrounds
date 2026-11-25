@@ -21,6 +21,10 @@ const EnvSchema = z.object({
   ]),
   DATABASE_URL: z.url(),
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  // true only behind a reverse proxy (nginx in compose): client IP from X-Forwarded-For, otherwise all clients share the proxy's IP and one rate limit
+  TRUST_PROXY: z.stringbool().default(false),
+  MODERATOR_EMAIL: z.email().default('moderator@bears.test'),
+  MODERATOR_PASSWORD: z.string().optional(),
 });
 
 // fails on startup if not valid

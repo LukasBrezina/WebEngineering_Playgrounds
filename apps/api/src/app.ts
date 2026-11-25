@@ -12,6 +12,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { STATUS_CODES } from 'node:http';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import {
@@ -63,8 +65,18 @@ export interface AppOptions {
   corsOrigins: string[];
   // Secure flag on the session cookie (production only, dev runs on http)
   secureCookies?: boolean;
+  // behind nginx: client IP from X-Forwarded-For (otherwise all clients share one rate limit)
+  trustProxy?: boolean;
   logger?: boolean;
 }
+
+export type App = FastifyInstance<
+  RawServerDefault,
+  RawRequestDefaultExpression,
+  RawReplyDefaultExpression,
+  FastifyBaseLogger,
+  ZodTypeProvider
+>;
 
 const SESSION_COOKIE = 'sid';
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -76,13 +88,31 @@ const { version } = JSON.parse(
 // only accept requestId of this pattern
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 
+function createFastify(logger: boolean, trustProxy: boolean): App {
+  return Fastify({
+    logger,
+    // trust only hop 0 (nginx): req.ip = the IP nginx appends to X-Forwarded-For;
+    // with `true` a client could send a fake X-Forwarded-For per request and bypass the rate limit
+    trustProxy: trustProxy ? (_address, hop) => hop === 0 : false,
+    bodyLimit: 10 * 1024, // 10 KB instead of 1 MB; larger bodies -> 413
+    requestIdHeader: false,
+    genReqId: (req) => {
+      const incoming = req.headers['x-request-id'];
+      return typeof incoming === 'string' && REQUEST_ID_PATTERN.test(incoming)
+        ? incoming
+        : randomUUID();
+    },
+  }).withTypeProvider<ZodTypeProvider>();
+}
+
 export async function buildApp({
   repos,
   corsOrigins,
   secureCookies = false,
+  trustProxy = false,
   logger = true,
 }: AppOptions): Promise<App> {
-  const app = createFastify(logger);
+  const app = createFastify(logger, trustProxy);
   // attaches the injected repositories to the Fastify instance (handlers use app.repos)
   app.decorate('repos', repos);
 
@@ -91,28 +121,27 @@ export async function buildApp({
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
+  // App registrations -----------------------------------------------------------
+
   // register() loads a plugin (hooks/routes); await = ready before the routes below are defined.
   await app.register(cors, {
-    origin: corsOrigins,
+    origin: corsOrigins, // fixed list, never '*'
+    credentials: true, // allowed origins may send the session cookie and read the response; never with origin '*'
     methods: ['GET', 'POST', 'DELETE'],
     allowedHeaders: ['content-type', 'x-request-id'],
     exposedHeaders: ['x-request-id', 'location'],
     maxAge: 600,
   });
 
+  // helmet adds multiple security headers to each answer from the API
+  // ex. Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options: nosniff, etc...
+  await app.register(helmet);
+
+  // only routes with config.rateLimit are limited
+  await app.register(rateLimit, { global: false });
+
   // parses the Cookie header into req.cookies, adds reply.setCookie / clearCookie
   await app.register(cookie);
-
-  // 401 Problem without a valid session cookie
-  const requireUser = async (req: FastifyRequest): Promise<User> => {
-    const sessionId = req.cookies[SESSION_COOKIE];
-    const user =
-      sessionId === undefined
-        ? undefined
-        : await app.repos.sessions.findUser(sessionId);
-    if (user === undefined) throw new UnauthorizedError();
-    return user;
-  };
 
   await app.register(swagger, {
     openapi: { openapi: '3.1.0', info: { title: 'Bears API', version } },
@@ -169,6 +198,35 @@ export async function buildApp({
     return reply.code(status).type('application/problem+json').send(problem);
   });
 
+  // Shared helpers and config for the routes -----------------------------------------------------------
+
+  const authRateLimit = {
+    rateLimit: { max: 5, timeWindow: '1 minute' }, // 5 attempts per IP and minute
+  };
+
+  const cookieOptions = {
+    httpOnly: true, // not readable from JavaScript (XSS)
+    secure: secureCookies, // HTTPS only in production
+    sameSite: 'lax' as const, // not sent on cross-site POSTs (CSRF)
+    path: '/api', // only sent to the API
+  };
+
+  // 401 Problem without a valid session cookie
+  const requireUser = async (req: FastifyRequest): Promise<User> => {
+    const sessionId = req.cookies[SESSION_COOKIE];
+    const user =
+      sessionId === undefined
+        ? undefined
+        : await app.repos.sessions.findUser(sessionId);
+    if (user === undefined) throw new UnauthorizedError();
+    return user;
+  };
+
+  const requireBear = async (id: string): Promise<void> => {
+    if ((await app.repos.bears.findById(id)) === undefined)
+      throw new NotFoundError('Bear');
+  };
+
   const BearParams = z.object({ id: z.string() });
 
   const HealthSchema = z.object({
@@ -182,9 +240,10 @@ export async function buildApp({
     uptime: process.uptime(),
   });
 
-  /*
-    ROUTES
-  */
+  const commentService = createCommentService(app.repos.comments);
+
+  // ROUTES ---------------------------------------------------------------------------
+
   app.get(
     '/health',
     { schema: { tags: ['health'], response: { 200: HealthSchema } } },
@@ -216,11 +275,6 @@ export async function buildApp({
       return { status: 'ready' as const };
     }
   );
-
-  const requireBear = async (id: string): Promise<void> => {
-    if ((await app.repos.bears.findById(id)) === undefined)
-      throw new NotFoundError('Bear');
-  };
 
   app.get(
     '/api/bears',
@@ -318,7 +372,7 @@ export async function buildApp({
     {
       schema: {
         tags: ['comments'],
-        params: z.object({ commentId: z.string() }),
+        params: z.object({ commentId: z.uuid() }),
         response: {
           204: z.undefined(),
           401: ProblemSchema,
@@ -338,14 +392,12 @@ export async function buildApp({
     }
   );
 
-  const commentService = createCommentService(app.repos.comments);
-
   app.post(
     '/api/comments/:commentId/report',
     {
       schema: {
         tags: ['comments'],
-        params: z.object({ commentId: z.string() }),
+        params: z.object({ commentId: z.uuid() }),
         response: { 200: ReportResultSchema, 404: ProblemSchema },
       },
     },
@@ -364,6 +416,7 @@ export async function buildApp({
   app.post(
     '/api/auth/register',
     {
+      config: authRateLimit,
       schema: {
         tags: ['auth'],
         body: RegisterSchema,
@@ -385,16 +438,10 @@ export async function buildApp({
     }
   );
 
-  const cookieOptions = {
-    httpOnly: true, // not readable from JavaScript (XSS)
-    secure: secureCookies, // HTTPS only in production
-    sameSite: 'lax' as const, // not sent on cross-site POSTs (CSRF)
-    path: '/api', // only sent to the API
-  };
-
   app.post(
     '/api/auth/login',
     {
+      config: authRateLimit,
       schema: {
         tags: ['auth'],
         body: LoginSchema,
@@ -464,25 +511,4 @@ export async function buildApp({
   });
 
   return app;
-}
-
-export type App = FastifyInstance<
-  RawServerDefault,
-  RawRequestDefaultExpression,
-  RawReplyDefaultExpression,
-  FastifyBaseLogger,
-  ZodTypeProvider
->;
-
-function createFastify(logger: boolean): App {
-  return Fastify({
-    logger,
-    requestIdHeader: false,
-    genReqId: (req) => {
-      const incoming = req.headers['x-request-id'];
-      return typeof incoming === 'string' && REQUEST_ID_PATTERN.test(incoming)
-        ? incoming
-        : randomUUID();
-    },
-  }).withTypeProvider<ZodTypeProvider>();
 }

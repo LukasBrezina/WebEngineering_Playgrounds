@@ -33,6 +33,7 @@
   - [Task 1](#task-1--users-and-password-storage)
   - [Task 2](#task-2--login-and-session-with-a-written-decision)
   - [Task 3](#task-3--authorisation-for-comments)
+  - [Task 4](#task-4--harden-the-api)
 
 # Playground 1
 
@@ -1260,3 +1261,45 @@ The response carries `x-request-id: demo-42` and `"instance": "urn:request:demo-
 #### Why hiding a button is not a security control
 - The client is under the user's control: curl or DevTools send the request without the UI.
 - Only the server check protects. Hiding the button is UX: it hides actions that would fail with 403.
+
+## Task 4 – Harden the API
+
+### Map your measures to the OWASP Top 10: which items do they address? Explain token bucket versus fixed window rate limiting, and what "defence in depth" means for this API.
+
+#### Measures and OWASP Top 10 (2025)
+| Measure | Protects against | OWASP |
+|---|---|---|
+| Rate limit on login/register (5 per minute and IP, 429 + `Retry-After`) | brute force, credential stuffing | A07 Authentication Failures |
+| `@fastify/helmet` (CSP, `nosniff`, `X-Frame-Options`, HSTS) | XSS, clickjacking, MIME sniffing, missing defaults | A02 Security Misconfiguration, A05 Injection (XSS) |
+| Strict CORS (fixed origins, `credentials: true`, never `*`) | foreign sites reading responses with the user's cookie | A01 Broken Access Control, A02 Security Misconfiguration |
+| Body limit (10 KB, otherwise 413) | huge requests eating memory and CPU | A06 Insecure Design (resource consumption, DoS) |
+| zod on params, query, body and environment | invalid or malicious input, wrong config at startup | A05 Injection, A02 Security Misconfiguration |
+| Secrets only from env, `.env.example`, gitleaks in CI | passwords and keys leaked through git | A04 Cryptographic Failures, A07 (hard-coded credentials) |
+
+#### Token bucket vs. fixed window
+- **Fixed window:** count requests per key (here: IP) in a fixed time window, e.g. max 5 per minute; the counter resets when the window ends.
+  - Simple and cheap: one counter per key.
+  - Weakness: bursts at the boundary. 5 requests at the end of one window and 5 at the start of the next → 10 requests in a few seconds.
+  - `@fastify/rate-limit` works like this; for login that is enough, because a few attempts per minute still make brute force useless.
+- **Token bucket:** each key has a bucket with up to N tokens; tokens refill at a steady rate (e.g. 1 every 12 s). Each request takes one token; empty bucket → 429.
+  - Allows short bursts up to N, but the long-term rate can never exceed the refill rate.
+  - Smoother and fairer, but needs per-key state (tokens + last refill time).
+
+#### Defence in depth
+- No single measure is perfect, so several independent layers are combined; if one fails, the next one still protects.
+- Brute force on login: long passwords (Task 1) → slow argon2id hash → rate limit → same error for wrong email and wrong password.
+- XSS: React escapes output → CSP from helmet blocks foreign scripts → `HttpOnly` cookie cannot be stolen → `SameSite=Lax` and strict CORS limit what foreign sites can do.
+- Access: zod rejects invalid input → `requireUser` (401) → policy check (403) → database constraints (FK, unique).
+
+#### Helmet
+Security headers set by `@fastify/helmet` on every API response (CSP, HSTS, nosniff, X-Frame-Options, Referrer-Policy):
+- `Content-Security-Policy` – scripts, styles, images only from allowed sources → injected scripts don't run (XSS)
+- `Strict-Transport-Security` – browser uses only HTTPS for this site for one year → no downgrade to HTTP
+- `X-Content-Type-Options: nosniff` – browser trusts the `Content-Type` and doesn't guess → JSON/text is never run as a script
+- `X-Frame-Options: SAMEORIGIN` – page can only be embedded in an iframe by itself → no clickjacking
+- `Referrer-Policy: no-referrer` – no source URL sent when following links → no URL leaks to other sites
+- `Cross-Origin-Opener-Policy: same-origin` – foreign windows get no access to our window → no `window.opener` attacks
+- `Cross-Origin-Resource-Policy: same-origin` – responses can only be embedded by the same origin → foreign sites can't load our API responses
+```bash
+curl -I http://localhost:8080/api/bears
+```

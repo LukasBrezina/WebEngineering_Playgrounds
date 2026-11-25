@@ -16,7 +16,7 @@ The database is a separate service and must be running before `npm run dev`. The
 
 ```bash
 npm install
-cp .env.example .env                      # DATABASE_URL=postgres://web:web@localhost:5432/web
+cp .env.example .env                      # set POSTGRES_PASSWORD and the same password in DATABASE_URL
 docker compose up -d db                   # only the database, port 5432
 npm run db:migrate                        # create the tables (once, and after every new migration)
 npm run db:seed                           # fetch the bears from Wikipedia and upsert them
@@ -54,9 +54,10 @@ No real secrets are needed; the database credentials are local development defau
 | `HOST` | api | `0.0.0.0` | Interface the API binds to |
 | `WIKIPEDIA_API_URL` | api (seed) | `https://en.wikipedia.org/w/api.php` | Upstream URL used by `db:seed`; the API itself reads bears from the database |
 | `CORS_ORIGINS` | api | `http://localhost:4173,http://localhost:5173` | Comma-separated CORS allow-list (`compose.yaml` adds `http://localhost:8080`) |
+| `TRUST_PROXY` | api | `false` (`compose.yaml`: `true`) | Take the client IP from `X-Forwarded-For`; only behind a reverse proxy (nginx), needed for the per-IP rate limit (Playground 6, Task 4) |
 | `MODERATOR_EMAIL` | api (seed) | `moderator@bears.test` | Account that `db:seed` creates with the role `moderator` (Playground 6, Task 3) |
 | `MODERATOR_PASSWORD` | api (seed) | none, moderator seed is skipped | Password of the moderator; only in `.env`, never in git |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | compose | `web` / `web` / `web` | Credentials of the `db` container; `compose.yaml` builds the API's `DATABASE_URL` from them |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | compose | `web` / **none (required)** / `web` | Credentials of the `db` container; `compose.yaml` builds the API's `DATABASE_URL` from them. The password only comes from `.env`, `docker compose` stops without it |
 | `VITE_API_BASE_URL` | web (build time) | empty | Empty: same-origin requests to `/api`. Absolute URL (e.g. `http://localhost:3000`): cross-origin requests, used for the CORS demo with `vite preview` |
 
 Examples:
